@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+"""ai <soru>        -> cevap
+   ai -e <istek>    -> komut üret, onayla, çalıştır
+   <komut> |& ai <soru>  -> çıktıyı/hatayı modele ver"""
+import json, subprocess, sys, urllib.request
+
+URL = "http://127.0.0.1:11435/v1/chat/completions"
+EXEC_SYS = (
+    "You are a Linux shell expert on Ubuntu 22.04. Reply with ONE shell command and nothing "
+    "else: no explanation, no markdown, no backticks. Rules: act on the current directory "
+    "unless a path is given, never invent placeholder paths. Prefer ss over netstat. "
+    "User services use systemctl --user. Only read or report; never delete, move or "
+    "overwrite anything unless explicitly asked.")
+
+
+def ask(prompt, system=None, max_tokens=400):
+    msgs = ([{"role": "system", "content": system}] if system else []) + \
+           [{"role": "user", "content": prompt}]
+    req = urllib.request.Request(
+        URL, json.dumps({"messages": msgs, "max_tokens": max_tokens}).encode(),
+        {"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=300) as r:
+            return json.load(r)["choices"][0]["message"]["content"].strip()
+    except urllib.error.URLError:
+        sys.exit("ai: sunucuya ulaşılamadı. Başlat: systemctl --user start ai-npu")
+
+
+def confirm(q):
+    """Girdi boruyla geldiyse stdin dolu; onayı klavyeden al.
+       Terminal yoksa (betik, cron) onay alınamaz -> çalıştırma."""
+    try:
+        tty = open("/dev/tty")
+    except OSError:
+        print("ai: terminal yok, komut çalıştırılmadı", file=sys.stderr)
+        return ""
+    with tty:
+        sys.stdout.write(q); sys.stdout.flush()
+        return tty.readline().strip().lower()
+
+
+args = sys.argv[1:]
+if not args:
+    sys.exit(__doc__)
+
+# kırpmayı sunucu yapar, sınırı bilen o; buradaki tavan sadece kazara `cat *.log` içindir
+piped = "" if sys.stdin.isatty() else sys.stdin.read()[-40000:]
+
+if args[0] == "-e":
+    cmd = ask(" ".join(args[1:]) + piped, EXEC_SYS, 120)
+    print(f"\n  \033[1m{cmd}\033[0m\n")
+    if confirm("çalıştır? [e/H] ") in ("e", "y"):
+        subprocess.run(cmd, shell=True)
+else:
+    q = " ".join(args)
+    print(ask(f"{q}\n\n{piped}" if piped else q))
