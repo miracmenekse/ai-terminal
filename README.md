@@ -14,7 +14,7 @@ apt update 2>&1 | ai "bu hata neden oldu"  # çıktıyı modele ver
 ## Kurulum
 
 ```bash
-git clone <bu-depo> && cd ai-terminal
+git clone https://github.com/miracmenekse/ai-terminal.git && cd ai-terminal
 ./install.sh CPU        # veya: ./install.sh NPU
 ```
 
