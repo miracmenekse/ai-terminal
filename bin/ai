@@ -1,8 +1,20 @@
 #!/usr/bin/env python3
-"""ai <soru>        -> cevap
-   ai -e <istek>    -> komut üret, onayla, çalıştır
-   <komut> |& ai <soru>  -> çıktıyı/hatayı modele ver"""
-import json, subprocess, sys, urllib.request
+"""KULLANIM
+  ai <soru>                    cevap ver
+  ai -e <istek>                komut üret, onayını sor, çalıştır
+  <komut> 2>&1 | ai <soru>     çıktıyı/hatayı modele ver
+
+ÖRNEK
+  ai chmod 755 ne demek
+  ai -e 8080 portunu hangi program dinliyor
+  apt update 2>&1 | ai bu hata neden oldu
+  journalctl --user -u ai-npu -n 30 | ai servis neden çalışmıyor
+
+SERVİS
+  systemctl --user status|restart|stop ai-npu
+
+Soruyu tırnak içine almana gerek yok. Tırnak gerekir: ' " ` $ ! ( ) ; | karakterleri varsa."""
+import json, os, stat, subprocess, sys, urllib.request
 
 URL = "http://127.0.0.1:11435/v1/chat/completions"
 EXEC_SYS = (
@@ -11,6 +23,11 @@ EXEC_SYS = (
     "unless a path is given, never invent placeholder paths. Prefer ss over netstat. "
     "User services use systemctl --user. Only read or report; never delete, move or "
     "overwrite anything unless explicitly asked.")
+
+
+PIPE_SYS = ("The user pasted real command output. Answer their question about THAT "
+            "output in Turkish, citing its actual numbers. Do not output a shell "
+            "command and do not explain what the command does.")
 
 
 def ask(prompt, system=None, max_tokens=400):
@@ -43,8 +60,11 @@ args = sys.argv[1:]
 if not args:
     sys.exit(__doc__)
 
-# kırpmayı sunucu yapar, sınırı bilen o; buradaki tavan sadece kazara `cat *.log` içindir
-piped = "" if sys.stdin.isatty() else sys.stdin.read()[-40000:]
+# Sadece boru veya dosya yönlendirmesi varsa oku. isatty() yetmiyor: terminalsiz
+# ortamda (betik, cron) girdi hiç gelmeyeceği halde sonsuza kadar bekliyordu.
+# Kırpmayı sunucu yapar, sınırı bilen o; buradaki tavan kazara `cat *.log` içindir.
+_m = os.fstat(sys.stdin.fileno()).st_mode
+piped = sys.stdin.read()[-40000:] if stat.S_ISFIFO(_m) or stat.S_ISREG(_m) else ""
 
 if args[0] == "-e":
     cmd = ask(" ".join(args[1:]) + piped, EXEC_SYS, 120)
@@ -53,4 +73,9 @@ if args[0] == "-e":
         subprocess.run(cmd, shell=True)
 else:
     q = " ".join(args)
-    print(ask(f"{q}\n\n{piped}" if piped else q))
+    # Boruyla gelen metni etiketliyorum; etiketsizken model çıktıyı yorumlamak
+    # yerine komutu açıklıyordu.
+    if piped:
+        print(ask(f"Komut çıktısı:\n{piped}\n\nSoru: {q}", PIPE_SYS))
+    else:
+        print(ask(q))

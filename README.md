@@ -9,7 +9,7 @@ ai -e 8080 portunu hangi program dinliyor  # komut üret, onayla, çalıştır
 apt update 2>&1 | ai "bu hata neden oldu"  # çıktıyı modele ver
 ```
 
-`-e` modu komutu **sen onaylamadan çalıştırmaz.**
+`-e` modu komutu **sen onaylamadan çalıştırmaz.** Ayrıntılı kullanım: [KULLANIM.md](KULLANIM.md)
 
 ## Kurulum
 
@@ -80,3 +80,4 @@ Geçiş: `./install.sh NPU` (veya unit dosyasındaki `AI_NPU_DEVICE`).
 | `bin/ai` | terminalden kullandığın komut |
 | `install.sh` | her şeyi kuran betik |
 | `ai-npu.service` | systemd kullanıcı servisi |
+| `KULLANIM.md` | kullanım kılavuzu |

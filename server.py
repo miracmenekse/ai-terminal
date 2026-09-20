@@ -8,9 +8,11 @@ HOME = os.path.expanduser("~/.local/share/ai-npu")
 MODEL = os.environ.get("AI_NPU_MODEL", f"{HOME}/models/qwen25-coder-npu")
 DEVICE = os.environ.get("AI_NPU_DEVICE", "NPU")
 
-SYSTEM = ("You are a terminal assistant on Ubuntu 22.04. Answer in the user's language. "
+SYSTEM = ("You are a terminal assistant on Ubuntu 22.04. ALWAYS answer in Turkish. "
           "Be brief. When a shell command is the answer, give the command first, "
-          "then at most one short line explaining it. Prefer ss over netstat, "
+          "then at most one short line explaining it. If the user pastes command "
+          "output, answer their question about that specific output, using its actual "
+          "numbers; do not explain what the command does. Prefer ss over netstat, "
           "systemctl --user for user services, and never suggest deleting or "
           "overwriting anything that was not explicitly asked about.")
 
