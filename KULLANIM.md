@@ -100,6 +100,10 @@ kısa betik yazdırma, çıktıdaki sayıları okuma.
 
 `-e` modunun onay sorması bu yüzden var. Komutu okumadan `e` deme.
 
+Cevapta geri dönüşü olmayan bir komut geçerse (silme, biçimlendirme, `reboot`,
+`apt purge`) terminal sarı bir uyarı basar, tarayıcı arayüzü kırmızı şerit gösterir.
+Uyarı komutu engellemez — kararı sen verirsin, ama farkında olmadan uygulamayasın diye.
+
 ## Bir şeyler ters giderse
 
 | belirti | ne yap |

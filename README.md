@@ -161,3 +161,4 @@ Geçiş: `./install.sh GPU|CPU|NPU` (veya unit dosyasındaki `AI_NPU_DEVICE`).
 | `chat.html` | tarayıcı sohbet arayüzü |
 | `ai-npu.service` | systemd kullanıcı servisi |
 | `KULLANIM.md` | kullanım kılavuzu |
+| `test-senaryolar.py` | 80 senaryoluk güvenilirlik testi |

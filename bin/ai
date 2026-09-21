@@ -17,28 +17,16 @@ Soruyu tırnak içine almana gerek yok. Tırnak gerekir: ' " ` $ ! ( ) ; | karak
 import json, os, stat, subprocess, sys, urllib.request
 
 URL = "http://127.0.0.1:11435/v1/chat/completions"
-EXEC_SYS = (
-    "You are a Linux shell expert on Ubuntu 22.04. Reply with ONE shell command and nothing "
-    "else: no explanation, no markdown, no backticks. Rules: act on the current directory "
-    "unless a path is given, never invent placeholder paths. Prefer ss over netstat. "
-    "User services use systemctl --user. Only read or report; never delete, move or "
-    "overwrite anything unless explicitly asked.")
-
-
-PIPE_SYS = ("The user pasted real command output. Answer their question about THAT "
-            "output in Turkish, citing its actual numbers. Do not output a shell "
-            "command and do not explain what the command does.")
-
-
-def ask(prompt, system=None, max_tokens=400):
-    msgs = ([{"role": "system", "content": system}] if system else []) + \
-           [{"role": "user", "content": prompt}]
+def ask(prompt, mode=None, max_tokens=400):
+    """Talimatlar sunucuda; burada sadece hangi mod oldugunu soyluyoruz."""
     req = urllib.request.Request(
-        URL, json.dumps({"messages": msgs, "max_tokens": max_tokens}).encode(),
+        URL, json.dumps({"messages": [{"role": "user", "content": prompt}],
+                         "mode": mode, "max_tokens": max_tokens}).encode(),
         {"Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=300) as r:
-            return json.load(r)["choices"][0]["message"]["content"].strip()
+            y = json.load(r)
+            return y["choices"][0]["message"]["content"].strip(), y.get("risk")
     except urllib.error.URLError:
         sys.exit("ai: sunucuya ulaşılamadı. Başlat: systemctl --user start ai-npu")
 
@@ -66,16 +54,21 @@ if not args:
 _m = os.fstat(sys.stdin.fileno()).st_mode
 piped = sys.stdin.read()[-40000:] if stat.S_ISFIFO(_m) or stat.S_ISREG(_m) else ""
 
+UYARI = "\033[1;33m  ⚠ geri dönüşü olmayan bir komut içeriyor, okumadan uygulama\033[0m"
+
 if args[0] == "-e":
-    cmd = ask(" ".join(args[1:]) + piped, EXEC_SYS, 120)
+    cmd, risk = ask(" ".join(args[1:]) + piped, "exec", 120)
     print(f"\n  \033[1m{cmd}\033[0m\n")
+    if risk:
+        print(UYARI + "\n")
     if confirm("çalıştır? [e/H] ") in ("e", "y"):
         subprocess.run(cmd, shell=True)
 else:
     q = " ".join(args)
     # Boruyla gelen metni etiketliyorum; etiketsizken model çıktıyı yorumlamak
     # yerine komutu açıklıyordu.
-    if piped:
-        print(ask(f"Komut çıktısı:\n{piped}\n\nSoru: {q}", PIPE_SYS))
-    else:
-        print(ask(q))
+    cevap, risk = (ask(f"Komut çıktısı:\n{piped}\n\nSoru: {q}", "pipe") if piped
+                   else ask(q))
+    print(cevap, flush=True)
+    if risk:
+        print(UYARI, file=sys.stderr)

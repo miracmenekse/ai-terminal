@@ -31,6 +31,8 @@
                       font-family:ui-monospace,Menlo,Consolas,monospace; font-size:14px; }
   .bekle { color:var(--dim); font-style:italic; }
   .hata { color:#ff8f8f; }
+  .uyari { display:block; margin-top:8px; padding:6px 9px; border-radius:6px;
+           background:#3a2a12; border:1px solid #7a5a20; color:#ffcf7a; font-size:13px; }
   #ayar { border-top:1px solid var(--line); background:var(--panel); padding:10px 16px;
           display:flex; gap:20px; align-items:center; flex-wrap:wrap; font-size:13px; }
   #ayar label { display:flex; align-items:center; gap:8px; color:var(--dim); }
@@ -120,10 +122,18 @@ async function gonder() {
                             top_p:+$("#topp").value, max_tokens:+$("#uzun").value})
     });
     if (!y.ok) throw new Error("sunucu " + y.status);
-    const cevap = (await y.json()).choices[0].message.content;
+    const gelen = await y.json();
+    const cevap = gelen.choices[0].message.content;
     gecmis.push({role:"assistant", content:cevap});
     bekleyen.className = "m ai";
     bekleyen.textContent = cevap;
+    if (gelen.risk) {
+      const u = document.createElement("span");
+      u.className = "uyari";
+      u.textContent = "⚠ Bu cevap geri dönüşü olmayan bir komut içeriyor (silme, biçimlendirme, " +
+                      "yeniden başlatma). Uygulamadan önce oku, emin değilsen uygulama.";
+      bekleyen.appendChild(u);
+    }
     const sn = ((Date.now()-basladi)/1000).toFixed(1);
     const not = document.createElement("span");
     not.style.cssText = "color:var(--dim);font-size:12px;display:block;margin-top:6px";
