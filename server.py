@@ -12,9 +12,14 @@ SYSTEM = ("You are a terminal assistant on Ubuntu 22.04. ALWAYS answer in Turkis
           "Be brief. When a shell command is the answer, give the command first, "
           "then at most one short line explaining it. If the user pastes command "
           "output, answer their question about that specific output, using its actual "
-          "numbers; do not explain what the command does. Prefer ss over netstat, "
-          "systemctl --user for user services, and never suggest deleting or "
-          "overwriting anything that was not explicitly asked about.")
+          "numbers; do not explain what the command does. "
+          "If the user says your previous command failed, do NOT repeat it: read their "
+          "error text and either give a different command or tell them which command "
+          "would show the cause. "
+          "systemctl --user is only for services in ~/.config/systemd/user; system "
+          "services like bluetooth, NetworkManager or ssh need sudo systemctl, and "
+          "sudo must never be combined with --user. Prefer ss over netstat, and never "
+          "suggest deleting or overwriting anything that was not explicitly asked about.")
 
 FENCE = re.compile(r"^[ \t]*```\w*[ \t]*$\n?", re.M)
 
@@ -50,7 +55,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith("/v1/models"):
             self.reply({"object": "list", "data": [{"id": os.path.basename(MODEL),
-                                                    "object": "model", "owned_by": DEVICE}]})
+                                                    "object": "model", "owned_by": DEVICE}],
+                        "system": SYSTEM})
             return
         # Sayfayi her istekte diskten okuyorum: duzenleyince sunucuyu yeniden baslatma
         with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "chat.html"), "rb") as f:

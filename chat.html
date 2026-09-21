@@ -19,7 +19,9 @@
   header span { color:var(--dim); font-size:13px; }
   #temizle { margin-left:auto; background:none; border:1px solid var(--line);
              color:var(--dim); border-radius:6px; padding:4px 10px; cursor:pointer; font-size:13px; }
-  #temizle:hover { color:var(--fg); border-color:var(--dim); }
+  #sifirla { background:none; border:1px solid var(--line); color:var(--dim);
+            border-radius:6px; padding:5px 10px; cursor:pointer; font-size:13px; }
+  #sifirla:hover, #temizle:hover { color:var(--fg); border-color:var(--dim); }
   main { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:14px; }
   .m { max-width:min(760px,92%); padding:10px 14px; border-radius:10px; white-space:pre-wrap;
        word-wrap:break-word; }
@@ -62,6 +64,7 @@
   <label>uzunluk <input type="range" id="uzun" min="50" max="1000" step="50" value="400">
     <output id="uzunV">400</output></label>
   <textarea id="talimat" spellcheck="false"></textarea>
+  <button id="sifirla" title="Sunucudaki varsayılan talimata dön">sıfırla</button>
 </div>
 
 <footer>
@@ -70,17 +73,13 @@
 </footer>
 
 <script>
-const VARSAYILAN =
-  "Ubuntu 22.04 üzerinde çalışan bir terminal asistanısın. Her zaman Türkçe cevap ver. " +
-  "Kısa ol. Cevap bir kabuk komutuysa önce komutu yaz, altına en fazla bir satır açıklama ekle. " +
-  "netstat yerine ss, kullanıcı servisleri için systemctl --user kullan. " +
-  "İstenmedikçe hiçbir şeyi silmeyi veya üzerine yazmayı önerme.";
+let varsayilan = "";   // sunucudan gelir
 
 const $ = s => document.querySelector(s);
 const sohbet = $("#sohbet");
 let gecmis = [];          // sunucuya giden mesajlar
 
-$("#talimat").value = localStorage.getItem("talimat") || VARSAYILAN;
+
 for (const [kaydirici, ciktı, bicim] of [["#temp","#tempV",v=>(+v).toFixed(1)],
                                          ["#topp","#toppV",v=>(+v).toFixed(2)],
                                          ["#uzun","#uzunV",v=>v]]) {
@@ -147,9 +146,18 @@ $("#soru").addEventListener("keydown", e => {
 });
 $("#temizle").addEventListener("click", () => { gecmis = []; sohbet.innerHTML = ""; $("#soru").focus(); });
 
+$("#sifirla").addEventListener("click", () => {
+  $("#talimat").value = varsayilan;
+  localStorage.setItem("talimat", varsayilan);
+});
+
 fetch("/v1/models").then(r => r.json())
-  // owned_by = modelin gercekte calistigi cihaz; klasor adi yaniltici olabiliyor
-  .then(d => $("#model").textContent = d.data[0].id + " · " + d.data[0].owned_by + " üzerinde")
+  .then(d => {
+    // owned_by = modelin gercekte calistigi cihaz; klasor adi yaniltici olabiliyor
+    $("#model").textContent = d.data[0].id + " · " + d.data[0].owned_by + " üzerinde";
+    varsayilan = d.system;
+    $("#talimat").value = localStorage.getItem("talimat") || varsayilan;
+  })
   .catch(() => $("#model").textContent = "sunucuya ulaşılamadı");
 $("#soru").focus();
 </script>

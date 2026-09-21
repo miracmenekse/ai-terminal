@@ -62,7 +62,7 @@ ve alttaki kaydırıcılardan model davranışını değiştirebilirsin.
 | sıcaklık | 0 = hep aynı cevap, kesin işler için doğrusu. Yükseldikçe çeşitlenir. **1,0 üstünde bu model bozuluyor**, Çince karakterler üretiyor |
 | top_p | kelime havuzunun genişliği. Sıcaklık 0 iken etkisi yok |
 | uzunluk | cevabın azami token sayısı. Uzun betik isteyeceksen yükselt |
-| talimat | modelin kim olduğunu söyleyen metin. Değiştirip deneyebilirsin, tarayıcıda saklanır |
+| talimat | modelin kim olduğunu söyleyen metin. Değiştirip deneyebilirsin, tarayıcıda saklanır. **sıfırla** düğmesi sunucudaki güncel varsayılana döndürür |
 
 "temizle" düğmesi geçmişi siler. Sayfayı kapatınca sohbet kaybolur, ayarlar kalır.
 
@@ -86,6 +86,11 @@ biraz uzun sürer, sonrakiler 2-3 saniye.
 kısa betik yazdırma, çıktıdaki sayıları okuma.
 
 **Güvenilmez:**
+- **Israr.** Verdiği komut hata verdiğini söylediğinde çoğu zaman aynı komutu tekrar eder.
+  Hata metnini okuyup teşhis koymaz. Bunun yerine şöyle sor:
+  `ai 'bluetooth neden açılmıyor, sebebini hangi komutla görürüm'` — bu biçime doğru
+  cevap verir (`systemctl status bluetooth`, `journalctl -k | grep -i bluetooth` gibi).
+  Asıl teşhisi sen yapacaksın; model sana bakılacak yeri söyler.
 - **Yargı cümleleri.** `df` çıktısına "Evet, diskiniz dolu. Kullanım %29, yani %71 boş"
   diyebiliyor — sayıyı doğru okuyup sonucu ters söylüyor. Sayılara bak, hükme bakma.
 - **Güncel sürüm bilgisi.** İnterneti yok, bilgisi eskidir. Yeni paketleri bilmez.
