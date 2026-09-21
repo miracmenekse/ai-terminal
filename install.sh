@@ -87,6 +87,7 @@ fi
 # 5) Dosyalar
 install -m 755 "$SRC/server.py" "$ROOT/server.py"
 install -m 644 "$SRC/chat.html" "$ROOT/chat.html"
+install -m 644 "$SRC/sik-kullanilanlar.md" "$ROOT/sik-kullanilanlar.md"
 install -m 755 "$SRC/bin/ai" "$HOME/.local/bin/ai"
 install -m 755 "$SRC/bin/gpu-izle" "$HOME/.local/bin/gpu-izle"
 sed -e "s/^Environment=AI_NPU_DEVICE=.*/Environment=AI_NPU_DEVICE=$DEVICE/" \

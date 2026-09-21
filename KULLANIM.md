@@ -30,7 +30,23 @@ başka her şey (veya sadece Enter) iptal eder. Komutu beğenmezsen Enter'a bas,
 **2b. Sürekli oturum — `ai -i`**
 
 Claude'daki gibi: sorarsın, komutu gösterir, onaylarsın, çalıştırır, çıktıyı gösterir
-ve **çıktıyı hatırlar**, üstüne devam edebilirsin.
+ve **çıktıyı modele okutur** — teşhisi model koyar, gerekiyorsa kendiliğinden bir
+sonraki komutu önerir. Linux bilmene gerek kalmasın diye asıl mod bu.
+
+```
+$ ai -i
+› mikrofonum çalışmıyor
+  wpctl status
+  çalıştır? [e/H] e
+  ...
+  pactl list sources short          <- ilkini okuyup kendisi karar verdi
+  çalıştır? [e/H] e
+  ...
+alsa_input...hw_sofhdadsp_6__source RUNNING — mikrofon donanımsal olarak çalışıyor.
+```
+
+Bir istekte en fazla 5 komut zincirler; teşhis uzarsa "devam" diye tekrar sorarsın.
+Sistemi değiştiren komut önerdiğinde de aynı onay sorulur, okumadan `e` deme.
 
 ```
 $ ai -i
@@ -157,16 +173,15 @@ biraz uzun sürer, sonrakiler 2-3 saniye.
 kısa betik yazdırma, çıktıdaki sayıları okuma.
 
 **Güvenilmez:**
-- **Israr.** Verdiği komut hata verdiğini söylediğinde çoğu zaman aynı komutu tekrar eder.
-  Hata metnini okuyup teşhis koymaz. Bunun yerine şöyle sor:
-  `ai 'bluetooth neden açılmıyor, sebebini hangi komutla görürüm'` — bu biçime doğru
-  cevap verir (`systemctl status bluetooth`, `journalctl -k | grep -i bluetooth` gibi).
-  Asıl teşhisi sen yapacaksın; model sana bakılacak yeri söyler.
+- **Israr.** Tek atışlık modlarda (`ai <soru>`, `ai -e`) komut hata verdiğinde aynı komutu
+  tekrar edebilir; hata metnini okumaz. **Teşhis için `ai -i` kullan** — orada çıktıyı
+  modele geri veriyor, o okuyup sonraki adıma karar veriyor (aşağıdaki teşhis döngüsü).
 - **Yargı cümleleri.** `df` çıktısına "Evet, diskiniz dolu. Kullanım %29, yani %71 boş"
   diyebiliyor — sayıyı doğru okuyup sonucu ters söylüyor. Sayılara bak, hükme bakma.
 - **Güncel sürüm bilgisi.** İnterneti yok, bilgisi eskidir. Yeni paketleri bilmez.
 - **Uzun metin.** Uzun logu `tail -30` ile kırp, yoksa hem yavaşlar hem dağılır.
-- **Hafıza.** Her komut sıfırdan başlar; "az önce dediğin" diye devam edemezsin.
+- **Hafıza.** `ai -i` dışında her komut sıfırdan başlar; "az önce dediğin" diye devam
+  edemezsin. Süreklilik isteyen her iş `-i` içinde yapılmalı.
 - **Dosyaların.** Kendiliğinden dosya okuyamaz: `cat dosya | ai "..."` diye vereceksin.
 
 `-e` modunun onay sorması bu yüzden var. Komutu okumadan `e` deme.
@@ -183,4 +198,5 @@ Uyarı komutu engellemez — kararı sen verirsin, ama farkında olmadan uygulam
 | İlk soru çok uzun sürüyor | Normal, model yükleniyor. Sonrakiler hızlı |
 | Cevap alakasız | Soruyu kısalt, boruyla verdiğin metni `tail` ile kırp |
 | `ai: command not found` | `export PATH=$HOME/.local/bin:$PATH` satırını `~/.bashrc`'ye ekle |
+| Cevap yarıda kesiliyor | `AI_TOKEN=1200 ai -i` — akıl yürüten modellerde 400 token yetmez |
 | Bellek lazım | `systemctl --user stop ai-npu` — 7,9 GB boşalır |

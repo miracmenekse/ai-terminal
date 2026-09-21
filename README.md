@@ -91,6 +91,38 @@ gpt-oss'ta `analysis...assistantfinal`). `clean()` bunu ayıklıyor, ama bütçe
 düşünürken biterse ortada cevap kalmıyor: o zaman ham metin gösteriliyor ki
 kullanıcı boş ekran görmesin.
 
+## Ajan döngüsü (2026-09-21)
+
+Tek atışlık test %97 verirken çok adımlı işler çöküyordu. Üç ayrı kusur vardı ve
+**üçü de modelde değil, taşıma katmanındaydı:**
+
+- **Çıktı modele hiç okutulmuyordu.** `bin/ai` komut çıktısını geçmişe atıp yerine
+  sahte bir `"tamam"` yazıyordu; model kendi istediği çıktıyı görmüyordu. Teşhis
+  döngüsü bu yüzden yoktu. Düzeltince zincir 1/6'dan 5/6'ya çıktı.
+- **Heredoc tek satırlık protokole sığmıyor.** Model betik yazmak için
+  `cat > f << EOF` üretiyor, gövdesi kayboluyordu. Çözüm modelde değil talimatta:
+  tek satırlık `printf` biçimi. Dikkat, `printf` kendi `%` belirtecini yiyor —
+  betik içindeki her `%` **`%%`** yazılmalı, yoksa `date +%F` boş tarih üretir.
+- **Boş çıktı "bulunamadı" sanılıyordu.** `mv`, `cp`, `printf` başarılı olunca
+  sessizdir; modele `(boş)` diye gönderince işi doğru yaptığı halde "hiç dosya
+  bulunamadı" diyordu. En tehlikeli kusur buydu: doğru iş, yanlış rapor.
+  `sonuc_metni()` artık çıkış kodu 0 + boş çıktıyı "başarılı ve sessiz" diye anlatıyor.
+  Otomasyon 4/6'dan 6/6'ya bu düzeltmeyle çıktı.
+
+Ayrıca **model bitişi fark etmeyip aynı komutu tekrarlıyor.** Talimata "tekrarlama"
+yazmak işe yaramadı; istemci tarafındaki sayaç çözdü: aynı komut üçüncü kez
+gelirse çalıştırılmıyor. İkinciye izin var, çünkü arada durum değişmişse yeniden
+kontrol meşrudur.
+
+**gpt-oss-20b ile karşılaştırma, ajan döngüsünde:** zincir 6/6, otomasyon 5/6 —
+Qwen3-Coder'dan 1 puan iyi, ama tek komut 12-15 sn (Qwen 0,3-3 sn) ve 400 token
+bütçesi ona yetmiyor, akıl yürütürken bitirip cevapsız kalıyor (`AI_TOKEN=1500`
+gerekiyor). Üstelik aynı "kendi çıktısını yanlış okuma" kusuru onda da var,
+ters yönde: işi yaptığı halde "hiç dosya bulunamadı" diyor. **Yukarıdaki üç
+düzeltmeden sonra Qwen3-Coder 6/6'ya çıktığı için model değişikliğine gerek
+kalmadı.** Ölçüm oynaklığı (aynı test, sıcaklık 0: 3/6, 4/6, 6/6) iki model
+arasındaki farktan büyüktü; tek koşuya bakıp model değiştirmeyin.
+
 **En büyük kazanç modelden değil sistem talimatından geldi.** `server.py` ve `bin/ai`
 içindeki talimata şu dört kuralı eklemek aynı modeli 7/8'den 8/8'e çıkardı:
 bulunduğun klasörde çalış ve uydurma yol yazma · `netstat` yerine `ss` · kullanıcı
@@ -164,4 +196,6 @@ Geçiş: `./install.sh GPU|CPU|NPU` (veya unit dosyasındaki `AI_NPU_DEVICE`).
 | `bin/gpu-izle` | iGPU çalışıyor mu gösterir |
 | `ai-npu.service` | systemd kullanıcı servisi |
 | `KULLANIM.md` | kullanım kılavuzu |
-| `test-senaryolar.py` | 80 senaryoluk güvenilirlik testi |
+| `test-senaryolar.py` | 86 senaryoluk tek-atış testi (komut üretme, kurulum, boru, güvenlik) |
+| `test-zincir.py` | teşhis döngüsü testi: model çıktıyı okuyup sonraki adıma karar verebiliyor mu |
+| `test-otomasyon.py` | otomasyon testi: çok adımlı bir iş gerçekten bitiyor mu (kum havuzunda) |

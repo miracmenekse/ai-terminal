@@ -4,6 +4,7 @@
   ai -e <istek>                komut üret, onayını sor, çalıştır
   <komut> 2>&1 | ai <soru>     çıktıyı/hatayı modele ver
   ai -i                        sürekli oturum: sor, onayla, çalıştır, devam et
+  ai help [konu]               sık kullanılan Ubuntu komutları (help ses, help paket)
 
 ÖRNEK
   ai chmod 755 ne demek
@@ -18,12 +19,20 @@ Soruyu tırnak içine almana gerek yok. Tırnak gerekir: ' " ` $ ! ( ) ; | karak
 import json, os, re, stat, subprocess, sys, urllib.request
 
 URL = "http://127.0.0.1:11435/v1/chat/completions"
+# Sik kullanilanlar sayfasi: once kurulu kopya, gelistirirken depodaki.
+SIK = next((p for p in (os.path.expanduser("~/.local/share/ai-npu/sik-kullanilanlar.md"),
+                        os.path.join(os.path.dirname(os.path.dirname(
+                            os.path.realpath(__file__))), "sik-kullanilanlar.md"))
+            if os.path.exists(p)), None)
+# Akil yuruten model (gpt-oss) cevaptan once dusunuyor: 400 token ona yetmiyor,
+# butce dusunurken bitince ortada cevap kalmiyor. AI_TOKEN ile buyutulebilir.
+BUTCE = int(os.environ.get("AI_TOKEN", 400))
 UYARI = "\033[1;33m  ⚠ geri dönüşü olmayan bir komut içeriyor, okumadan uygulama\033[0m"
-def ask(prompt, mode=None, max_tokens=400, gecmis=()):
+def ask(prompt, mode=None, max_tokens=None, gecmis=()):
     """Talimatlar sunucuda; burada sadece hangi mod oldugunu soyluyoruz."""
     req = urllib.request.Request(
         URL, json.dumps({"messages": list(gecmis) + [{"role": "user", "content": prompt}],
-                         "mode": mode, "max_tokens": max_tokens}).encode(),
+                         "mode": mode, "max_tokens": max_tokens or BUTCE}).encode(),
         {"Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=300) as r:
@@ -56,8 +65,55 @@ EKRAN = re.compile(r"^\s*(sudo\s+)?(htop|top|nano|vim|vi|less|more|man|watch|ssh
                    r"intel_gpu_top|gpu-izle|nvtop|tail\s+-f|journalctl[^|]*-f)\b")
 
 
+ZINCIR = 5   # ponytail: bir istekte en fazla 5 komut; teshis uzarsa kullanici "devam" der
+
+
+def yardim(konu=""):
+    """`help` bolum listesini, `help <kelime>` eslesen bolumleri basar.
+       212 satiri ekrana dokmek getirmek degil; once ne var onu goster."""
+    if not SIK:
+        print("sık kullanılanlar sayfası bulunamadı: sik-kullanilanlar.md")
+        return
+    with open(SIK, encoding="utf-8") as f:
+        metin = f.read()
+    # "## baslik" ile bolumlere ayir; ilk parca giris yazisi.
+    parcalar = re.split(r"^## ", metin, flags=re.M)
+    bolumler = [("## " + p).rstrip() for p in parcalar[1:]]
+    if not konu:
+        print("\n\033[1msık kullanılanlar\033[0m — ayrıntı için: \033[1mhelp <kelime>\033[0m\n")
+        for b in bolumler:
+            bas = b.split("\n")[0][3:]
+            print("  " + bas)
+        print("\n  hepsi: \033[2mless " + SIK + "\033[0m")
+        return
+    k = konu.lower()
+    # Once baslikta ara; "ses" araminin ornek satiri yuzunden "ai" bolumunu
+    # getirmesi gurultu. Baslikta yoksa govdeye bak.
+    esler = [b for b in bolumler if k in b.split("\n")[0].lower()] or \
+            [b for b in bolumler if k in b.lower()]
+    if not esler:
+        print(f"'{konu}' geçen bölüm yok. Bölümler için sadece: help")
+        return
+    for b in esler:
+        print("\n" + b)
+
+
+def sonuc_metni(kod, cikti):
+    """Komut sonucunu modelin yanlis okumayacagi bicimde anlat."""
+    if cikti:
+        return f"Komut çıktısı (çıkış kodu {kod}):\n{cikti[-1500:]}"
+    if kod == 0:
+        return ("Komut BAŞARIYLA çalıştı (çıkış kodu 0) ve ekrana hiçbir şey yazmadı. "
+                "mv, cp, mkdir, printf, chmod gibi komutlar başarılı olduklarında sessizdir; "
+                "bu bir başarısızlık DEĞİLDİR ve 'hiçbir şey bulunamadı' anlamına GELMEZ. "
+                "Sonucu görmek istiyorsan ls veya cat ile ayrıca kontrol et.")
+    return f"Komut HATA verdi (çıkış kodu {kod}) ve hiçbir çıktı üretmedi."
+
+
 def etkilesimli():
-    """Claude'daki gibi: sor -> komut -> onay -> calistir -> ciktiyi hatirla."""
+    """Sor -> komut -> onay -> calistir -> ciktiyi MODELE OKUT -> teshis veya sonraki komut.
+       Onceden cikti gecmise atilip sahte 'tamam' yaziliyordu: model kendi istedigi
+       ciktiyi hic okumuyordu. Ubuntu bilmeyen kullaniciya teshisi model koymali."""
     print("Sürekli oturum. Çıkmak için Ctrl-D veya 'q'.")
     gecmis = []
     while True:
@@ -69,59 +125,92 @@ def etkilesimli():
             continue
         if istek in ("q", "çık", "cik", "exit"):
             return
-        cevap, risk = ask(istek, "oturum", 400, gecmis)
-        gecmis += [{"role": "user", "content": istek},
-                   {"role": "assistant", "content": cevap}]
-        gecmis = gecmis[-10:]
-        satirlar = cevap.split("\n")
-        # Model calistirilacak komutu "$ " ile isaretler; isaret yoksa duz cevaptir.
-        m = ISARET.match(satirlar[0])
-        if not m:
-            print(f"\n{cevap}")
+        if istek.split()[0].lower() in ("help", "yardım", "yardim", "?"):
+            yardim(" ".join(istek.split()[1:]))
+            continue
+        kok, kosulan = istek, []
+        for adim in range(ZINCIR):
+            # Pencere son 10 mesaj. Zincirde her adim 2 mesaj ekledigi icin 5. adimda
+            # asil istek disari tasiyor ve model gorevi unutup donguye giriyordu;
+            # ilk istegi pencerenin basina sabitliyorum.
+            pencere = gecmis[-8:]
+            if adim:
+                pencere = [{"role": "user", "content": f"Asıl görev: {kok}"}] + pencere
+            cevap, risk = ask(istek, "oturum", BUTCE, pencere)
+            gecmis = (gecmis + [{"role": "user", "content": istek},
+                                {"role": "assistant", "content": cevap}])[-10:]
+            satirlar = cevap.split("\n")
+            # Model calistirilacak komutu "$ " ile isaretler; isaret yoksa duz cevaptir.
+            # Isareti HER satirda ariyorum: model duzenli olarak once bir cumle yazip
+            # komutu altina koyuyor, sadece ilk satira bakinca zincir orada oluyordu.
+            esler = [(i, m) for i, m in enumerate(map(ISARET.match, satirlar)) if m]
+            if not esler:
+                print(f"\n{cevap}")
+                if risk:
+                    print(UYARI)
+                break
+            i, m = esler[0]
+            cmd = m.group(1)
+            # Model bitisi fark etmeyip ayni komutu tekrarliyordu; talimat yetmedi.
+            # Ikinci kez gelirse calistirmiyorum, zaten kostugunu soyleyip devam ediyorum.
+            if kosulan.count(cmd) >= 2:      # bir yeniden kontrol mesru, ucuncusu dongu
+                print(f"  \033[2m(zaten çalıştırıldı: {cmd})\033[0m")
+                istek = (f"Bu komutu zaten çalıştırdın ve çıktısını gördün: {cmd}\n"
+                         "Aynı komut aynı sonucu verir. Bir şeyin değişmesini bekliyorsan "
+                         "önce o değişikliği YAPAN komutu çalıştır: betik yazdıysan "
+                         "./betik.sh ile çalıştır, dosya bekliyorsan onu üreten komutu ver. "
+                         "Yapacak adım kalmadıysa sonucu özetle.")
+                continue
+            kosulan.append(cmd)
+            aciklama = "\n".join(satirlar[:i] + satirlar[i + 1:]).strip()
+            print(f"\n  \033[1m{cmd}\033[0m")
+            if aciklama:
+                print(f"  \033[2m{aciklama}\033[0m")
             if risk:
                 print(UYARI)
-            continue
-        cmd = m.group(1)
-        aciklama = "\n".join(satirlar[1:]).strip()
-        print(f"\n  \033[1m{cmd}\033[0m")
-        if aciklama:
-            print(f"  \033[2m{aciklama}\033[0m")
-        if risk:
-            print(UYARI)
-        try:
-            onay = input("  çalıştır? [e/H] ").strip().lower()
-        except (EOFError, KeyboardInterrupt):
-            print(); return
-        if onay not in ("e", "y"):
-            print("  atlandı")
-        elif EKRAN.match(cmd):
-            subprocess.run(cmd, shell=True)          # kendi ekranini yonetsin
-        else:
+            try:
+                onay = input("  çalıştır? [e/H] ").strip().lower()
+            except (EOFError, KeyboardInterrupt):
+                print(); return
+            if onay not in ("e", "y"):
+                print("  atlandı")
+                break
+            if EKRAN.match(cmd):
+                subprocess.run(cmd, shell=True)          # kendi ekranini yonetsin
+                break                                    # ciktisi yok, okutacak sey yok
             # Parola sorusu terminale dusmeli. Ciktiyi yakaladigimiz icin sudo'nun
-            # sorusu yutuluyordu; once sudo -v ile yetkiyi ekranda alip sonra
-            # komutu calistiriyorum.
-            if re.search(r"\bsudo\b", cmd) and subprocess.run(["sudo", "-n", "true"],
-                                                               capture_output=True).returncode:
+            # sorusu yutuluyordu; once sudo -v ile yetkiyi ekranda alip sonra calistir.
+            if re.search(r"\bsudo\b", cmd) and subprocess.run(
+                    ["sudo", "-n", "true"], capture_output=True).returncode:
                 print("  sudo yetkisi gerekiyor:")
                 if subprocess.run(["sudo", "-v"]).returncode:
                     print("  parola alınamadı, atlandı")
-                    continue
+                    break
             r = subprocess.run(cmd, shell=True, text=True,
                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             cikti = (r.stdout or "").rstrip()
             print(cikti or "  (çıktı yok)")
             if r.returncode:
                 print(f"  \033[33mçıkış kodu {r.returncode}\033[0m")
-            if cikti:
-                gecmis.append({"role": "user",
-                               "content": f"Komut çıktısı:\n{cikti[-1500:]}"})
-                gecmis.append({"role": "assistant", "content": "tamam"})
-        gecmis = gecmis[-10:]
+            # Ciktiyi modele geri ver: teshisi o koysun, gerekiyorsa sonraki komutu versin.
+            # Bos cikti + cikis 0'i "(boş)" diye gondermek modeli yaniltiyordu: mv/cp/printf
+            # basarili olunca sessizdir, model bunu "bulunamadi" sanip isi yaptigi halde
+            # "hic dosya yoktu" diyordu. Anlamini acikca yaziyorum.
+            istek = sonuc_metni(r.returncode, cikti)
+            print("  \033[2m...okuyor\033[0m", end="\r", flush=True)
+        else:
+            print(f"  \033[2m({ZINCIR} adım doldu, devam için tekrar sor)\033[0m")
+        if len(kosulan) > 1:
+            print("  \033[2myapılan: " + "  ·  ".join(kosulan) + "\033[0m")
 
 
 args = sys.argv[1:]
 if not args:
     sys.exit(__doc__)
+
+if args[0].lower() in ("help", "yardım", "yardim"):
+    yardim(" ".join(args[1:]))
+    sys.exit()
 
 if args[0] == "-i":
     etkilesimli()
