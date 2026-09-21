@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """NPU üzerinde çalışan, OpenAI uyumlu küçük LLM sunucusu.
    python server.py test  -> modeli yüklemeden öz-kontrol"""
-import json, os, re, sys
+import json, os, random, re, sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 HOME = os.path.expanduser("~/.local/share/ai-npu")
@@ -47,18 +47,40 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
 
+    def do_GET(self):
+        if self.path.startswith("/v1/models"):
+            self.reply({"object": "list", "data": [{"id": os.path.basename(MODEL),
+                                                    "object": "model", "owned_by": "local"}]})
+            return
+        # Sayfayi her istekte diskten okuyorum: duzenleyince sunucuyu yeniden baslatma
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "chat.html"), "rb") as f:
+            self.send_bytes(f.read(), "text/html; charset=utf-8")
+
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         cfg = og.GenerationConfig()
         cfg.max_new_tokens = int(body.get("max_tokens") or 400)
-        cfg.do_sample = False
+        temp = float(body.get("temperature") or 0)
+        cfg.do_sample = temp > 0          # 0 = her zaman ayni cevap
+        if cfg.do_sample:
+            cfg.temperature = temp
+            cfg.top_p = float(body.get("top_p") or 1.0)
+            # tohum sabit kalirsa ayni sicaklikta ayni cevap gelir
+            cfg.rng_seed = int(body.get("seed") or random.randrange(2**31))
+        if body.get("repetition_penalty"):
+            cfg.repetition_penalty = float(body["repetition_penalty"])
         text = clean(str(pipe.generate(build_prompt(body.get("messages", [])), cfg)))
-        data = json.dumps({
-            "choices": [{"message": {"role": "assistant", "content": text},
-                         "finish_reason": "stop", "index": 0}],
-            "model": os.path.basename(MODEL), "object": "chat.completion"}).encode()
+        self.reply({"choices": [{"message": {"role": "assistant", "content": text},
+                                 "finish_reason": "stop", "index": 0}],
+                    "model": os.path.basename(MODEL), "object": "chat.completion"})
+
+    def reply(self, obj):
+        self.send_bytes(json.dumps(obj).encode(), "application/json")
+
+    def send_bytes(self, data, ctype):
         self.send_response(200)
-        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Type", ctype)
+        self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)

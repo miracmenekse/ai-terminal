@@ -48,6 +48,24 @@ ai '$PATH değişkeni ne işe yarar'
 ai "bu ne demek: Permission denied"
 ```
 
+## Tarayıcıdan kullanmak
+
+```
+http://127.0.0.1:11435
+```
+
+Terminal yerine sohbet penceresi. Farkı: **geçmişi hatırlar** (son 6 mesaj),
+ve alttaki kaydırıcılardan model davranışını değiştirebilirsin.
+
+| ayar | ne yapar |
+|---|---|
+| sıcaklık | 0 = hep aynı cevap, kesin işler için doğrusu. Yükseldikçe çeşitlenir. **1,0 üstünde bu model bozuluyor**, Çince karakterler üretiyor |
+| top_p | kelime havuzunun genişliği. Sıcaklık 0 iken etkisi yok |
+| uzunluk | cevabın azami token sayısı. Uzun betik isteyeceksen yükselt |
+| talimat | modelin kim olduğunu söyleyen metin. Değiştirip deneyebilirsin, tarayıcıda saklanır |
+
+"temizle" düğmesi geçmişi siler. Sayfayı kapatınca sohbet kaybolur, ayarlar kalır.
+
 ## Servis
 
 Model arka planda açık durur, ilk soruda beklemezsin.

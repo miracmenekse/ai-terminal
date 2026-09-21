@@ -42,6 +42,7 @@ fi
 
 # 4) Dosyalar
 install -m 755 "$SRC/server.py" "$ROOT/server.py"
+install -m 644 "$SRC/chat.html" "$ROOT/chat.html"
 install -m 755 "$SRC/bin/ai" "$HOME/.local/bin/ai"
 sed "s/^Environment=AI_NPU_DEVICE=.*/Environment=AI_NPU_DEVICE=$DEVICE/" \
     "$SRC/ai-npu.service" > "$HOME/.config/systemd/user/ai-npu.service"

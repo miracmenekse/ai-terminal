@@ -22,7 +22,23 @@ Yaptığı şey: `~/.local/share/ai-npu` altına bir venv kurar, modeli indirir 
 `ai` komutunu `~/.local/bin`e koyar, `ai-npu` adlı systemd kullanıcı servisini açar.
 Tekrar çalıştırmak zararsız — var olanı yeniden indirmez.
 
-Sunucu 127.0.0.1:11435'te OpenAI uyumlu bir uç nokta sunar, yani başka istemciler de bağlanabilir.
+## Tarayıcı arayüzü
+
+Sunucu aynı adreste bir sohbet sayfası da servis eder:
+
+```
+http://127.0.0.1:11435
+```
+
+Sıcaklık, top_p ve cevap uzunluğu kaydırıcıları, canlı değiştirilebilen sistem talimatı
+ve sohbet geçmişi (son 6 mesaj modele gönderilir). Ayarlar tarayıcıda saklanır.
+Terminal kullanımı ayrıca çalışmaya devam eder.
+
+Adres OpenAI uyumlu olduğu için başka istemciler de bağlanabilir: `/v1/models` ve
+`/v1/chat/completions` mevcut (akış/streaming yok).
+
+**Sıcaklık:** bu bir kod modeli, 1,2'de Çince karakterler ve bozuk metin üretiyor.
+Kullanışlı aralık 0–0,7; terminal işleri için 0 doğru seçim.
 
 ## Model
 
@@ -79,5 +95,6 @@ Geçiş: `./install.sh NPU` (veya unit dosyasındaki `AI_NPU_DEVICE`).
 | `server.py` | modeli bir kez yükleyip açık tutan sunucu. `python server.py test` → model yüklemeden öz-kontrol |
 | `bin/ai` | terminalden kullandığın komut |
 | `install.sh` | her şeyi kuran betik |
+| `chat.html` | tarayıcı sohbet arayüzü |
 | `ai-npu.service` | systemd kullanıcı servisi |
 | `KULLANIM.md` | kullanım kılavuzu |
