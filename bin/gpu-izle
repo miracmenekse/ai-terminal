@@ -3,11 +3,6 @@
 #   gpu-izle        tek satirlik ozet: saat, uyaniklik, motor yuzdeleri
 #   gpu-izle -t     intel_gpu_top'un ham tablosu (tam ekran)
 #   gpu-izle 200    ornekleme araligi (ms), varsayilan 500
-#
-# intel_gpu_top'un sutun duzeni:
-#   req(1) act(2) irq(3) RC6(4) pkg(5)  RCS(6) BCS(9) VCS0(12) VCS1(15) VECS(18) UNKN(21)
-# Arrow Lake'te hesaplama (compute) motorunun adi yok, isi UNKN sutununda gorunur:
-# model cevap uretirken %80-96'ya cikar. Render/Blit/Video sifirda kalir, normal.
 command -v intel_gpu_top >/dev/null || {
   echo "intel_gpu_top yok:  sudo apt install -y intel-gpu-tools"; exit 1; }
 [ "$(cat /proc/sys/kernel/perf_event_paranoid)" -le 0 ] || {
@@ -17,13 +12,24 @@ command -v intel_gpu_top >/dev/null || {
 
 [ "${1:-}" = "-t" ] && exec intel_gpu_top
 
-echo "  saat   uyanık                  Render  Blit  Video  VidEnh  HESAPLAMA"
-exec stdbuf -oL intel_gpu_top -l -s "${1:-500}" | awk '
-  $1 ~ /^[0-9]+$/ {
-    uyanik = 100 - $4
-    bar = ""
-    for (i = 0; i < int(uyanik/5); i++) bar = bar "#"
-    printf "%5s MHz  %%%-3d %-20s %6.2f %5.2f %6.2f %7.2f %10.2f\n",
-           $2, uyanik, bar, $6, $9, $12, $18, $21
-    fflush()
-  }'
+# script: intel_gpu_top boruya yazarken 4 KB tampon dolana kadar bekliyor,
+#         sahte terminal verince satir satir akiyor. (stdbuf bu programda etkisiz.)
+# python:  mawk GIRDIYI tamponluyor, -Winteractive'i de "vacuous" deyip yok sayiyor.
+exec script -qec "intel_gpu_top -l -s ${1:-500}" /dev/null | python3 -u -c '
+import sys
+# intel_gpu_top -l sutunlari:
+#   req(0) act(1) irq(2) RC6(3) pkg(4)  RCS(5) BCS(8) VCS0(11) VCS1(14) VECS(17) UNKN(20)
+# Arrow Lake ta hesaplama motorunun adi yok, isi UNKN sutununda gorunur.
+print("  saat   uyanık                  Render  Blit  Video  VidEnh  HESAPLAMA")
+for satir in sys.stdin:
+    a = satir.split()
+    if len(a) < 21 or not a[0].isdigit():
+        continue
+    try:
+        uyanik = 100 - float(a[3])
+        print("%5s MHz  %%%-3d %-20s %6.2f %5.2f %6.2f %7.2f %10.2f"
+              % (a[1], uyanik, "#" * int(uyanik / 5),
+                 float(a[5]), float(a[8]), float(a[11]), float(a[17]), float(a[20])))
+    except ValueError:
+        continue
+'
