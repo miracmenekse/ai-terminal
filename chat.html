@@ -148,7 +148,8 @@ $("#soru").addEventListener("keydown", e => {
 $("#temizle").addEventListener("click", () => { gecmis = []; sohbet.innerHTML = ""; $("#soru").focus(); });
 
 fetch("/v1/models").then(r => r.json())
-  .then(d => $("#model").textContent = d.data[0].id)
+  // owned_by = modelin gercekte calistigi cihaz; klasor adi yaniltici olabiliyor
+  .then(d => $("#model").textContent = d.data[0].id + " · " + d.data[0].owned_by + " üzerinde")
   .catch(() => $("#model").textContent = "sunucuya ulaşılamadı");
 $("#soru").focus();
 </script>

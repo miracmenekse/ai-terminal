@@ -50,7 +50,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith("/v1/models"):
             self.reply({"object": "list", "data": [{"id": os.path.basename(MODEL),
-                                                    "object": "model", "owned_by": "local"}]})
+                                                    "object": "model", "owned_by": DEVICE}]})
             return
         # Sayfayi her istekte diskten okuyorum: duzenleyince sunucuyu yeniden baslatma
         with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "chat.html"), "rb") as f:
