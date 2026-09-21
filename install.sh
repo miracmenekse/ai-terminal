@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
-# Yerel terminal asistanini kurar.  Kullanim:  ./install.sh [CPU|NPU]
+# Yerel terminal asistanini kurar.  Kullanim:  ./install.sh [GPU|CPU|NPU]
 # Tekrar calistirmak zararsiz: var olan venv ve modeli yeniden indirmez.
 set -euo pipefail
 
-DEVICE=${1:-CPU}
+DEVICE=${1:-GPU}
 ROOT=$HOME/.local/share/ai-npu
-MODEL_REPO=llmware/qwen-2.5-coder-instruct-npu-ov
-MODEL=$ROOT/models/qwen25-coder-npu
+# Model iki yerden secilir: burasi varsayilan, ${2} ile gecici olarak degistirilebilir.
+# GPU/CPU varsayilani: Qwen3-Coder-30B-A3B (MoE, 3B aktif) - 16 GB indirme, ~15 GB RAM.
+# Az bellekli makinede:  ./install.sh GPU llmware/qwen-2.5-coder-instruct-npu-ov  (4,1 GB)
+# NPU channel-wise INT4 sart (-cw- / -npu-ov depolari), yani NPU'da ikinci komutu kullanin.
+MODEL_REPO=${2:-OpenVINO/Qwen3-Coder-30B-A3B-Instruct-int4-ov}
+MODEL=$ROOT/models/$(basename "$MODEL_REPO")
 SRC=$(cd "$(dirname "$0")" && pwd)
 
 echo "==> $DEVICE icin kuruluyor"
@@ -20,9 +24,9 @@ fi
 "$ROOT/venv/bin/python" -c 'import openvino_genai, huggingface_hub' 2>/dev/null ||
     "$ROOT/venv/bin/pip" install -q openvino-genai huggingface-hub
 
-# 2) Model (4.1 GB, sadece bir kez)
+# 2) Model (birkac GB, sadece bir kez)
 if [ ! -f "$MODEL/openvino_model.bin" ]; then
-    echo "==> model indiriliyor, 4.1 GB"
+    echo "==> model indiriliyor: $MODEL_REPO"
     "$ROOT/venv/bin/python" - "$MODEL_REPO" "$MODEL" <<'PY'
 import sys
 from huggingface_hub import snapshot_download
@@ -44,7 +48,8 @@ fi
 install -m 755 "$SRC/server.py" "$ROOT/server.py"
 install -m 644 "$SRC/chat.html" "$ROOT/chat.html"
 install -m 755 "$SRC/bin/ai" "$HOME/.local/bin/ai"
-sed "s/^Environment=AI_NPU_DEVICE=.*/Environment=AI_NPU_DEVICE=$DEVICE/" \
+sed -e "s/^Environment=AI_NPU_DEVICE=.*/Environment=AI_NPU_DEVICE=$DEVICE/" \
+    -e "s|^Environment=AI_NPU_MODEL=.*|Environment=AI_NPU_MODEL=$MODEL|" \
     "$SRC/ai-npu.service" > "$HOME/.config/systemd/user/ai-npu.service"
 
 # 5) Servis
@@ -60,6 +65,24 @@ echo "==> deneme sorusu:"
 case ":$PATH:" in *":$HOME/.local/bin:"*) ;;
   *) echo "!! ~/.local/bin PATH'te degil:  echo 'export PATH=\$HOME/.local/bin:\$PATH' >> ~/.bashrc" ;;
 esac
+if [ "$DEVICE" = GPU ]; then
+cat <<'MSG'
+
+!! GPU icin Intel compute runtime gerekiyor (bir kez, root):
+     curl -fsSL https://repositories.intel.com/gpu/intel-graphics.key \
+       | sudo gpg --yes --dearmor -o /usr/share/keyrings/intel-graphics.gpg
+     echo "deb [arch=amd64 signed-by=/usr/share/keyrings/intel-graphics.gpg] \
+https://repositories.intel.com/gpu/ubuntu jammy client" \
+       | sudo tee /etc/apt/sources.list.d/intel-gpu-jammy.list
+     # Ubuntu'nun 2022 tarihli libigdfcl1'i yerine Intel'inki gelsin diye pin sart,
+     # pin olmadan apt "tutulan bozuk paketler" diye reddeder:
+     printf 'Package: intel-opencl-icd libze-intel-gpu1 libze1 libigc1 libigdfcl1 libigdgmm12 intel-ocloc libigc-tools\nPin: origin repositories.intel.com\nPin-Priority: 1001\n\nPackage: *\nPin: origin repositories.intel.com\nPin-Priority: 100\n' \
+       | sudo tee /etc/apt/preferences.d/intel-gpu
+     sudo apt update && sudo apt install -y --no-install-recommends \
+       intel-opencl-icd libze-intel-gpu1 libze1 clinfo
+   Dogrulama:  clinfo -l    (Intel(R) Graphics gorunmeli)
+MSG
+fi
 if [ "$DEVICE" = NPU ]; then
 cat <<'MSG'
 

@@ -1,11 +1,16 @@
 [Unit]
-Description=Yerel LLM sunucusu (OpenVINO, CPU veya NPU)
+Description=Yerel LLM sunucusu (OpenVINO, GPU)
 After=default.target
 
 [Service]
 Environment=LD_LIBRARY_PATH=%h/.local/share/ai-npu/lib
-Environment=AI_NPU_DEVICE=CPU
+Environment=AI_NPU_DEVICE=GPU
+Environment=AI_NPU_MODEL=%h/.local/share/ai-npu/models/Qwen3-Coder-30B-A3B-Instruct-int4-ov
 ExecStart=%h/.local/share/ai-npu/venv/bin/python %h/.local/share/ai-npu/server.py
+# Uretim ortasindaki surec SIGTERM'i C++ icinde yutup yetim kaliyor ve cekirdekleri
+# yiyordu; stateless sunucu, SIGKILL guvenli.
+KillSignal=SIGKILL
+TimeoutStopSec=5
 Restart=on-failure
 RestartSec=5
 

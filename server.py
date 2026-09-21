@@ -21,15 +21,64 @@ SYSTEM = ("You are a terminal assistant on Ubuntu 22.04. ALWAYS answer in Turkis
           "sudo must never be combined with --user. Prefer ss over netstat, and never "
           "suggest deleting or overwriting anything that was not explicitly asked about.")
 
+# Her istemin sonuna eklenir: istemci kendi talimatini gonderse bile gecerli kalsin.
+# (Bu kural once sadece SYSTEM'de vardi; boru modunda istemcinin talimati onu eziyordu.)
+EXEC_SYS = (
+    "You are a Linux shell expert on Ubuntu 22.04. Reply with ONE shell command and nothing "
+    "else: no explanation, no markdown, no backticks. Act on the current directory unless a "
+    "path is given; never invent placeholder paths. A request to install something means the "
+    "install command, not running the program. Examples: "
+    "'vlc kur' -> sudo apt install -y vlc ; "
+    "'docker kur' -> sudo apt install -y docker.io ; "
+    "'8080 portunu hangi program dinliyor' -> sudo ss -tulnp | grep :8080 ; "
+    "'ai-npu kullanici servisinin loglari' -> journalctl --user -u ai-npu -n 50 . "
+    "systemctl --user and journalctl --user are for services under ~/.config/systemd/user; "
+    "everything else needs sudo systemctl.")
+
+PIPE_SYS = (
+    "The user pasted real command output. Answer their question about THAT output in Turkish, "
+    "citing its actual numbers. Do not output a shell command and do not explain what the "
+    "command does.")
+
+MODLAR = {"exec": EXEC_SYS, "pipe": PIPE_SYS}
+
+SAFETY = (" Safety rules, these always apply: give only the safest fix and only one; "
+          "never suggest deleting system files such as lock files, caches or anything "
+          "under /var, /etc or /usr; never suggest rebooting or reinstalling as a fix; "
+          "never delete or overwrite anything the user did not ask about. If the "
+          "information you were given does not show the cause, say which command would "
+          "show it instead of guessing.")
+
 FENCE = re.compile(r"^[ \t]*```\w*[ \t]*$\n?", re.M)
+
+# Dusunen modeller akil yurutmeyi cevabin onune koyuyor: Qwen3/LFM <think>...</think>,
+# gpt-oss harmony ise "analysis...assistantfinal...". Terminalde ikisi de okunmaz.
+# Kapanis etiketi yoksa (butce bitti) elde cevap yok demektir; o zaman dokunma ki
+# kullanici bos ekran yerine ham ciktiyi gorsun.
+DUSUNCE = re.compile(r"\A\s*(?:<think>.*?</think>|analysis.*?assistantfinal)\s*", re.S)
+
+# Modelin urettigi metinde geri donusu olmayan komutlari isaretle. Engellemiyorum,
+# uyariyorum: karar kullanicinin, ama farkinda olmadan uygulamasin.
+RISKLI = re.compile(r"""
+      \brm\s+(-\w+\s+)*(/|~|\$HOME|/var|/etc|/usr|/lib|/boot)   # sistem yolu silme
+    | \brm\s+-\w*[rf]                                          # rm -rf / -f
+    | \bmkfs\b | \bfdisk\b | \bparted\b
+    | \bdd\s+[^\n]*\bof=/dev/
+    | >\s*/dev/(sd|nvme)
+    | \bchmod\s+-R\s+777
+    | \b(reboot|shutdown|halt|poweroff)\b
+    | \bapt\b[^\n]*\b(remove|purge)\b
+    | \bdpkg\s+--(purge|force)
+    | :\(\)\s*\{                                              # fork bomb
+""", re.X | re.I)
 
 
 def clean(text):
-    """Terminalde markdown çiti okunmaz; çit satırlarını at, içeriğe dokunma."""
-    return FENCE.sub("", text).strip()
+    """Terminalde markdown çiti ve düşünce bloğu okunmaz; ikisini at, içeriğe dokunma."""
+    return FENCE.sub("", DUSUNCE.sub("", text)).strip()
 
 
-LIMIT = 900 if DEVICE == "NPU" else 0   # token; 0 = sinir yok (CPU dinamik sekil)
+LIMIT = 900 if DEVICE == "NPU" else 0   # token; 0 = sinir yok (CPU/GPU dinamik sekil)
 
 
 def fit(text):
@@ -39,12 +88,15 @@ def fit(text):
     return text
 
 
-def build_prompt(messages):
+def build_prompt(messages, mode=None):
     msgs = [dict(m) for m in messages]
     if msgs and msgs[-1].get("role") == "user":
         msgs[-1]["content"] = fit(msgs[-1]["content"])
     if not any(m.get("role") == "system" for m in msgs):
-        msgs = [{"role": "system", "content": SYSTEM}] + msgs
+        msgs = [{"role": "system", "content": MODLAR.get(mode, SYSTEM)}] + msgs
+    for m in msgs:
+        if m.get("role") == "system":
+            m["content"] = m["content"] + SAFETY
     return tok.apply_chat_template(msgs, True)
 
 
@@ -75,9 +127,11 @@ class Handler(BaseHTTPRequestHandler):
             cfg.rng_seed = int(body.get("seed") or random.randrange(2**31))
         if body.get("repetition_penalty"):
             cfg.repetition_penalty = float(body["repetition_penalty"])
-        text = clean(str(pipe.generate(build_prompt(body.get("messages", [])), cfg)))
+        text = clean(str(pipe.generate(
+            build_prompt(body.get("messages", []), body.get("mode")), cfg)))
         self.reply({"choices": [{"message": {"role": "assistant", "content": text},
                                  "finish_reason": "stop", "index": 0}],
+                    "risk": bool(RISKLI.search(text)),
                     "model": os.path.basename(MODEL), "object": "chat.completion"})
 
     def reply(self, obj):
@@ -97,6 +151,18 @@ def selftest():
     assert clean("df -h") == "df -h"
     assert clean("önce:\n```\nls\n```\nsonra") == "önce:\nls\nsonra"
     assert clean("echo ```") == "echo ```"        # satır ortasındaki çite dokunma
+    assert clean("<think>uzun uzun</think>\ndf -h") == "df -h"
+    assert clean("analysis kullanici disk soruyor assistantfinal df -h") == "df -h"
+    assert clean("<think>yarim kalmis") == "<think>yarim kalmis"   # kapanmadan kesme
+    riskli = ["sudo rm /var/lib/dpkg/lock-frontend", "rm -rf ~/projects", "sudo reboot",
+              "mkfs.ext4 /dev/sda1", "dd if=x of=/dev/sda", "sudo apt purge nginx",
+              "chmod -R 777 /etc"]
+    temiz = ["df -h", "ls -lt | head -n 6", "systemctl --user restart ai-npu",
+             "rm dosya.txt", "sed -i 's/a/b/g' not.txt", "sudo apt update"]
+    for t in riskli:
+        assert RISKLI.search(t), f"yakalanmadi: {t}"
+    for t in temiz:
+        assert not RISKLI.search(t), f"yanlis alarm: {t}"
     print("öz-kontrol geçti")
 
 
@@ -111,4 +177,4 @@ if __name__ == "__main__":
     pipe = og.LLMPipeline(MODEL, DEVICE, CACHE_DIR=f"{HOME}/cache/{DEVICE}", **kw)
     tok = pipe.get_tokenizer()
     print("hazır", file=sys.stderr, flush=True)
-    HTTPServer(("127.0.0.1", 11435), Handler).serve_forever()
+    HTTPServer(("127.0.0.1", int(os.environ.get("AI_NPU_PORT", 11435))), Handler).serve_forever()
