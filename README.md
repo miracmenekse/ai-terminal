@@ -5,6 +5,7 @@ hesap yok, API anahtarı yok. Intel Core Ultra üzerinde **GPU**, **CPU** veya *
 
 ```bash
 ai -i                                      # sürekli oturum: sor, onayla, çalıştır
+                                           # soru sorarsan cevaplar, iş istersen komut önerir
 ai "chmod 755 ne demek"                    # soru sor
 ai -e 8080 portunu hangi program dinliyor  # komut üret, onayla, çalıştır
 apt update 2>&1 | ai "bu hata neden oldu"  # çıktıyı modele ver

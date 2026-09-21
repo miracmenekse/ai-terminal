@@ -7,8 +7,11 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 HOME = os.path.expanduser("~/.local/share/ai-npu")
 MODEL = os.environ.get("AI_NPU_MODEL", f"{HOME}/models/qwen25-coder-npu")
 DEVICE = os.environ.get("AI_NPU_DEVICE", "NPU")
+_L = {"tr": "ALWAYS answer in Turkish.", "en": "ALWAYS answer in English."}
+DIL = _L.get(os.environ.get("AI_NPU_LANG", "auto"),
+             "Answer in the same language the user wrote in.")
 
-SYSTEM = ("You are a terminal assistant on Ubuntu 22.04. ALWAYS answer in Turkish. "
+SYSTEM = ("You are a terminal assistant on Ubuntu 22.04. " + DIL + " "
           "Be brief. When a shell command is the answer, give the command first, "
           "then at most one short line explaining it. If the user pastes command "
           "output, answer their question about that specific output, using its actual "
@@ -18,6 +21,8 @@ SYSTEM = ("You are a terminal assistant on Ubuntu 22.04. ALWAYS answer in Turkis
           "would show the cause. "
           "This machine: Intel Core Ultra 7 255H with Intel integrated graphics, NO NVIDIA "
           "GPU (never suggest nvidia-smi); audio runs on PipeWire, not PulseAudio. "
+          "Never invent package or command names; if unsure, first give a command that "
+          "checks (apt search, command -v). gpu-izle already exists here and shows iGPU usage. "
           "systemctl --user is only for services in ~/.config/systemd/user; system "
           "services like bluetooth, NetworkManager or ssh need sudo systemctl, and "
           "sudo must never be combined with --user. Prefer ss over netstat, and never "
@@ -36,6 +41,10 @@ EXEC_SYS = (
     "'ai-npu kullanici servisinin loglari' -> journalctl --user -u ai-npu -n 50 . "
     "This machine: Intel Core Ultra 7 255H with Intel integrated graphics, NO NVIDIA "
     "GPU (never suggest nvidia-smi); audio runs on PipeWire, not PulseAudio. "
+    "Never invent package or command names. If you are not sure a tool exists, give a "
+    "command that checks first (apt search ..., command -v ...). Tools already installed "
+    "here: intel_gpu_top and gpu-izle (iGPU usage), sensors, ss, journalctl, pactl, "
+    "bluetoothctl, nmcli, docker. For GPU usage the answer is gpu-izle, not an apt install. "
     "systemctl --user and journalctl --user are for services under ~/.config/systemd/user; "
     "everything else needs sudo systemctl.")
 
@@ -44,14 +53,26 @@ PIPE_SYS = (
     "citing its actual numbers. Do not output a shell command and do not explain what the "
     "command does.")
 
-MODLAR = {"exec": EXEC_SYS, "pipe": PIPE_SYS}
+# Surekli oturum: model komut mu cevap mi verecegine kendisi karar verir.
+# Calistirilacak komutu ilk satira "$ " ile isaretler; istemci sadece o isaretliyi
+# calistirmayi teklif eder. Isaret yoksa duz cevaptir, onay sorulmaz.
+OTURUM_SYS = (
+    SYSTEM +
+    " IMPORTANT: if the user asks you to DO something that a shell command performs, "
+    "put that single command on the FIRST line prefixed with '$ ' and nothing else on "
+    "that line; one short explanation line may follow. If the user asks a question, "
+    "chats, or wants an explanation, just answer normally and NEVER use the '$ ' prefix. "
+    "Examples: 'disk doluluk oranini goster' -> '$ df -h'. 'napiyorsun' -> a short "
+    "friendly answer with no command. 'chmod 755 ne demek' -> an explanation, no command.")
+
+MODLAR = {"exec": EXEC_SYS, "pipe": PIPE_SYS, "oturum": OTURUM_SYS}
 
 SAFETY = (" Safety rules, these always apply: give only the safest fix and only one; "
           "never suggest deleting system files such as lock files, caches or anything "
           "under /var, /etc or /usr; never suggest rebooting or reinstalling as a fix; "
           "never delete or overwrite anything the user did not ask about. If the "
           "information you were given does not show the cause, say which command would "
-          "show it instead of guessing.")
+          "show it instead of guessing. Never invent package or command names.")
 
 FENCE = re.compile(r"^[ \t]*```\w*[ \t]*$\n?", re.M)
 

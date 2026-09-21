@@ -47,6 +47,19 @@ Description: Ubuntu 22.04.5 LTS
 6.12.110-0612110-generic
 ```
 
+Soru sorarsan komut önermez, cevaplar:
+
+```
+› chmod 755 ne demek
+chmod 755, dosyanın sahibine okuma+yazma+çalıştırma, diğerlerine okuma+çalıştırma verir.
+
+› napıyorsun
+Ubuntu 22.04 ortamında komut satırında yardımcı oluyorum. Sizin için ne yapabilirim?
+```
+
+Komut mu cevap mı olduğuna model karar veriyor: çalıştırılacak komutu `$ ` işaretiyle
+gönderiyor, işaret yoksa düz cevap sayılıyor ve onay sorulmuyor.
+
 `sudo` gereken komutlarda parolayı **ekranda sorar**, yazarsın, devam eder.
 `htop`, `nano`, `watch`, `intel_gpu_top` gibi kendi ekranını yöneten programlar
 doğrudan terminale açılır; diğerlerinin çıktısı yakalanıp modele geri verilir.

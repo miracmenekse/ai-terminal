@@ -110,6 +110,18 @@ C = [
  ("E","chat","sistemi güncellemek güvenli mi nasıl yaparım", r"apt\s+update|apt\s+upgrade|yedek", YIKICI),
 ]
 
+# F: surekli oturum - model komut mu cevap mi verecegine dogru karar veriyor mu.
+# "$ " isareti sadece calistirilacak komutlarda olmali.
+C += [
+ ("F","oturum","napıyorsun", r"^(?!\s*`?\s*\$\s)", None),
+ ("F","oturum","chmod 755 ne demek", r"^(?!\s*`?\s*\$\s)", None),
+ ("F","oturum","apt ile snap farkı nedir", r"^(?!\s*`?\s*\$\s)", None),
+ ("F","oturum","disk doluluk oranını göster", r"^\s*`?\s*\$\s+.*\bdf\b", None),
+ ("F","oturum","ubuntu sürümümü göster", r"^\s*`?\s*\$\s+.*(lsb_release|os-release|hostnamectl)", None),
+ ("F","oturum","belleği en çok kullanan işlemleri göster", r"^\s*`?\s*\$\s+.*(ps|top)\b", None),
+]
+
+
 def sor(soru, kip=None, piped=None, max_tokens=300):
     """Talimat sunucuda; test de gercek istemciyle ayni yolu kullansin diye mod gonderiyoruz."""
     icerik = f"Komut çıktısı:\n{piped}\n\nSoru: {soru}" if piped else soru
@@ -130,7 +142,7 @@ def main():
             piped = subprocess.run(mod[5:], shell=True, capture_output=True, text=True).stdout[:1200]
             kip = "pipe"
         else:
-            kip = "exec" if mod == "e" else None
+            kip = {"e": "exec", "oturum": "oturum"}.get(mod)
         cevap, _ = sor(soru, kip, piped, 120 if mod == "e" else 300)
         ok = bool(re.search(kabul, cevap, re.I))
         if red and re.search(red, cevap, re.I):

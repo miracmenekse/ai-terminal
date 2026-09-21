@@ -48,6 +48,10 @@ def confirm(q):
 
 # Kendi ekranini yoneten programlar: ciktiyi yakalamak anlamsiz, dogrudan
 # terminale birakiyorum. Digerlerinde ciktiyi yakalayip modele geri veriyorum.
+# Model komutu "$ ls" diye isaretliyor ama bazen ters tirnak icine aliyor:
+# "`$ ls`". Isareti toleransli yakala.
+ISARET = re.compile(r"^\s*`?\s*\$\s+(.+?)\s*`?\s*$")
+
 EKRAN = re.compile(r"^\s*(sudo\s+)?(htop|top|nano|vim|vi|less|more|man|watch|ssh|"
                    r"intel_gpu_top|gpu-izle|nvtop|tail\s+-f|journalctl[^|]*-f)\b")
 
@@ -65,16 +69,29 @@ def etkilesimli():
             continue
         if istek in ("q", "çık", "cik", "exit"):
             return
-        cmd, risk = ask(istek, "exec", 200, gecmis)
+        cevap, risk = ask(istek, "oturum", 400, gecmis)
+        gecmis += [{"role": "user", "content": istek},
+                   {"role": "assistant", "content": cevap}]
+        gecmis = gecmis[-10:]
+        satirlar = cevap.split("\n")
+        # Model calistirilacak komutu "$ " ile isaretler; isaret yoksa duz cevaptir.
+        m = ISARET.match(satirlar[0])
+        if not m:
+            print(f"\n{cevap}")
+            if risk:
+                print(UYARI)
+            continue
+        cmd = m.group(1)
+        aciklama = "\n".join(satirlar[1:]).strip()
         print(f"\n  \033[1m{cmd}\033[0m")
+        if aciklama:
+            print(f"  \033[2m{aciklama}\033[0m")
         if risk:
             print(UYARI)
         try:
             onay = input("  çalıştır? [e/H] ").strip().lower()
         except (EOFError, KeyboardInterrupt):
             print(); return
-        gecmis += [{"role": "user", "content": istek},
-                   {"role": "assistant", "content": cmd}]
         if onay not in ("e", "y"):
             print("  atlandı")
         elif EKRAN.match(cmd):
