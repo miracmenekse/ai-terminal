@@ -3,6 +3,7 @@
   ai <soru>                    cevap ver
   ai -e <istek>                komut üret, onayını sor, çalıştır
   <komut> 2>&1 | ai <soru>     çıktıyı/hatayı modele ver
+  ai -i                        sürekli oturum: sor, onayla, çalıştır, devam et
 
 ÖRNEK
   ai chmod 755 ne demek
@@ -14,13 +15,14 @@ SERVİS
   systemctl --user status|restart|stop ai-npu
 
 Soruyu tırnak içine almana gerek yok. Tırnak gerekir: ' " ` $ ! ( ) ; | karakterleri varsa."""
-import json, os, stat, subprocess, sys, urllib.request
+import json, os, re, stat, subprocess, sys, urllib.request
 
 URL = "http://127.0.0.1:11435/v1/chat/completions"
-def ask(prompt, mode=None, max_tokens=400):
+UYARI = "\033[1;33m  ⚠ geri dönüşü olmayan bir komut içeriyor, okumadan uygulama\033[0m"
+def ask(prompt, mode=None, max_tokens=400, gecmis=()):
     """Talimatlar sunucuda; burada sadece hangi mod oldugunu soyluyoruz."""
     req = urllib.request.Request(
-        URL, json.dumps({"messages": [{"role": "user", "content": prompt}],
+        URL, json.dumps({"messages": list(gecmis) + [{"role": "user", "content": prompt}],
                          "mode": mode, "max_tokens": max_tokens}).encode(),
         {"Content-Type": "application/json"})
     try:
@@ -44,17 +46,75 @@ def confirm(q):
         return tty.readline().strip().lower()
 
 
+# Kendi ekranini yoneten programlar: ciktiyi yakalamak anlamsiz, dogrudan
+# terminale birakiyorum. Digerlerinde ciktiyi yakalayip modele geri veriyorum.
+EKRAN = re.compile(r"^\s*(sudo\s+)?(htop|top|nano|vim|vi|less|more|man|watch|ssh|"
+                   r"intel_gpu_top|gpu-izle|nvtop|tail\s+-f|journalctl[^|]*-f)\b")
+
+
+def etkilesimli():
+    """Claude'daki gibi: sor -> komut -> onay -> calistir -> ciktiyi hatirla."""
+    print("Sürekli oturum. Çıkmak için Ctrl-D veya 'q'.")
+    gecmis = []
+    while True:
+        try:
+            istek = input("\n\033[1;34m›\033[0m ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print(); return
+        if not istek:
+            continue
+        if istek in ("q", "çık", "cik", "exit"):
+            return
+        cmd, risk = ask(istek, "exec", 200, gecmis)
+        print(f"\n  \033[1m{cmd}\033[0m")
+        if risk:
+            print(UYARI)
+        try:
+            onay = input("  çalıştır? [e/H] ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print(); return
+        gecmis += [{"role": "user", "content": istek},
+                   {"role": "assistant", "content": cmd}]
+        if onay not in ("e", "y"):
+            print("  atlandı")
+        elif EKRAN.match(cmd):
+            subprocess.run(cmd, shell=True)          # kendi ekranini yonetsin
+        else:
+            # Parola sorusu terminale dusmeli. Ciktiyi yakaladigimiz icin sudo'nun
+            # sorusu yutuluyordu; once sudo -v ile yetkiyi ekranda alip sonra
+            # komutu calistiriyorum.
+            if re.search(r"\bsudo\b", cmd) and subprocess.run(["sudo", "-n", "true"],
+                                                               capture_output=True).returncode:
+                print("  sudo yetkisi gerekiyor:")
+                if subprocess.run(["sudo", "-v"]).returncode:
+                    print("  parola alınamadı, atlandı")
+                    continue
+            r = subprocess.run(cmd, shell=True, text=True,
+                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            cikti = (r.stdout or "").rstrip()
+            print(cikti or "  (çıktı yok)")
+            if r.returncode:
+                print(f"  \033[33mçıkış kodu {r.returncode}\033[0m")
+            if cikti:
+                gecmis.append({"role": "user",
+                               "content": f"Komut çıktısı:\n{cikti[-1500:]}"})
+                gecmis.append({"role": "assistant", "content": "tamam"})
+        gecmis = gecmis[-10:]
+
+
 args = sys.argv[1:]
 if not args:
     sys.exit(__doc__)
+
+if args[0] == "-i":
+    etkilesimli()
+    sys.exit()
 
 # Sadece boru veya dosya yönlendirmesi varsa oku. isatty() yetmiyor: terminalsiz
 # ortamda (betik, cron) girdi hiç gelmeyeceği halde sonsuza kadar bekliyordu.
 # Kırpmayı sunucu yapar, sınırı bilen o; buradaki tavan kazara `cat *.log` içindir.
 _m = os.fstat(sys.stdin.fileno()).st_mode
 piped = sys.stdin.read()[-40000:] if stat.S_ISFIFO(_m) or stat.S_ISREG(_m) else ""
-
-UYARI = "\033[1;33m  ⚠ geri dönüşü olmayan bir komut içeriyor, okumadan uygulama\033[0m"
 
 if args[0] == "-e":
     cmd, risk = ask(" ".join(args[1:]) + piped, "exec", 120)

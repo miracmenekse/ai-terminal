@@ -30,6 +30,10 @@
   .ai code, .ai pre { background:var(--code); border-radius:5px; padding:1px 5px;
                       font-family:ui-monospace,Menlo,Consolas,monospace; font-size:14px; }
   .bekle { color:var(--dim); font-style:italic; }
+  .kopyala { margin-top:8px; background:none; border:1px solid var(--line);
+             color:var(--dim); border-radius:6px; padding:3px 9px; cursor:pointer;
+             font-size:12px; font-family:inherit; }
+  .kopyala:hover { color:var(--fg); border-color:var(--dim); }
   .hata { color:#ff8f8f; }
   .uyari { display:block; margin-top:8px; padding:6px 9px; border-radius:6px;
            background:#3a2a12; border:1px solid #7a5a20; color:#ffcf7a; font-size:13px; }
@@ -133,6 +137,18 @@ async function gonder() {
       u.textContent = "⚠ Bu cevap geri dönüşü olmayan bir komut içeriyor (silme, biçimlendirme, " +
                       "yeniden başlatma). Uygulamadan önce oku, emin değilsen uygulama.";
       bekleyen.appendChild(u);
+    }
+    // Komut satirini kopyalamak icin: calistirmayi terminale birakiyoruz,
+    // sunucunun komut calistirmasi acik bir guvenlik yuzeyi olurdu.
+    const ilk = cevap.split("\n").find(l => l.trim());
+    if (ilk && ilk.length < 300) {
+      const k = document.createElement("button");
+      k.className = "kopyala";
+      k.textContent = "⧉ ilk satırı kopyala";
+      k.onclick = () => navigator.clipboard.writeText(ilk.trim())
+        .then(() => { k.textContent = "✓ kopyalandı"; setTimeout(() => k.textContent = "⧉ ilk satırı kopyala", 1500); });
+      bekleyen.appendChild(document.createElement("br"));
+      bekleyen.appendChild(k);
     }
     const sn = ((Date.now()-basladi)/1000).toFixed(1);
     const not = document.createElement("span");

@@ -16,6 +16,8 @@ SYSTEM = ("You are a terminal assistant on Ubuntu 22.04. ALWAYS answer in Turkis
           "If the user says your previous command failed, do NOT repeat it: read their "
           "error text and either give a different command or tell them which command "
           "would show the cause. "
+          "This machine: Intel Core Ultra 7 255H with Intel integrated graphics, NO NVIDIA "
+          "GPU (never suggest nvidia-smi); audio runs on PipeWire, not PulseAudio. "
           "systemctl --user is only for services in ~/.config/systemd/user; system "
           "services like bluetooth, NetworkManager or ssh need sudo systemctl, and "
           "sudo must never be combined with --user. Prefer ss over netstat, and never "
@@ -32,6 +34,8 @@ EXEC_SYS = (
     "'docker kur' -> sudo apt install -y docker.io ; "
     "'8080 portunu hangi program dinliyor' -> sudo ss -tulnp | grep :8080 ; "
     "'ai-npu kullanici servisinin loglari' -> journalctl --user -u ai-npu -n 50 . "
+    "This machine: Intel Core Ultra 7 255H with Intel integrated graphics, NO NVIDIA "
+    "GPU (never suggest nvidia-smi); audio runs on PipeWire, not PulseAudio. "
     "systemctl --user and journalctl --user are for services under ~/.config/systemd/user; "
     "everything else needs sudo systemctl.")
 
@@ -140,7 +144,6 @@ class Handler(BaseHTTPRequestHandler):
     def send_bytes(self, data, ctype):
         self.send_response(200)
         self.send_header("Content-Type", ctype)
-        self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)

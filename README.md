@@ -4,6 +4,7 @@ Terminalden konuşulan, tamamen yerelde çalışan küçük bir asistan. İntern
 hesap yok, API anahtarı yok. Intel Core Ultra üzerinde **GPU**, **CPU** veya **NPU** ile çalışır.
 
 ```bash
+ai -i                                      # sürekli oturum: sor, onayla, çalıştır
 ai "chmod 755 ne demek"                    # soru sor
 ai -e 8080 portunu hangi program dinliyor  # komut üret, onayla, çalıştır
 apt update 2>&1 | ai "bu hata neden oldu"  # çıktıyı modele ver
@@ -158,7 +159,8 @@ Geçiş: `./install.sh GPU|CPU|NPU` (veya unit dosyasındaki `AI_NPU_DEVICE`).
 | `server.py` | modeli bir kez yükleyip açık tutan sunucu. `python server.py test` → model yüklemeden öz-kontrol |
 | `bin/ai` | terminalden kullandığın komut |
 | `install.sh` | her şeyi kuran betik |
-| `chat.html` | tarayıcı sohbet arayüzü |
+| `chat.html` | tarayıcı sohbet arayüzü (komut çalıştırmaz, kopyalar) |
+| `bin/gpu-izle` | iGPU çalışıyor mu gösterir |
 | `ai-npu.service` | systemd kullanıcı servisi |
 | `KULLANIM.md` | kullanım kılavuzu |
 | `test-senaryolar.py` | 80 senaryoluk güvenilirlik testi |

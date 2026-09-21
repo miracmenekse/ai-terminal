@@ -27,6 +27,30 @@ ai -e rapor klasörünü tarih adıyla yedekle
 Ekranda komut belirir, altında `çalıştır? [e/H]` sorusu çıkar. `e` + Enter çalıştırır,
 başka her şey (veya sadece Enter) iptal eder. Komutu beğenmezsen Enter'a bas, hiçbir şey olmaz.
 
+**2b. Sürekli oturum — `ai -i`**
+
+Claude'daki gibi: sorarsın, komutu gösterir, onaylarsın, çalıştırır, çıktıyı gösterir
+ve **çıktıyı hatırlar**, üstüne devam edebilirsin.
+
+```
+$ ai -i
+Sürekli oturum. Çıkmak için Ctrl-D veya 'q'.
+
+› ubuntu sürümümü göster
+  lsb_release -a
+  çalıştır? [e/H] e
+Description: Ubuntu 22.04.5 LTS
+
+› peki çekirdek sürümü
+  uname -r
+  çalıştır? [e/H] e
+6.12.110-0612110-generic
+```
+
+`sudo` gereken komutlarda parolayı **ekranda sorar**, yazarsın, devam eder.
+`htop`, `nano`, `watch`, `intel_gpu_top` gibi kendi ekranını yöneten programlar
+doğrudan terminale açılır; diğerlerinin çıktısı yakalanıp modele geri verilir.
+
 **3. Çıktıyı boruyla ver** — gerçek sayıları okuyup yorumlar.
 
 ```bash
@@ -49,6 +73,11 @@ ai "bu ne demek: Permission denied"
 ```
 
 ## Tarayıcıdan kullanmak
+
+Tarayıcı arayüzü **komut çalıştırmaz** — bu bilinçli. Sunucuya komut çalıştıran bir uç
+eklemek, makinede dinleyen her şeyin ulaşabileceği bir kapı açardı. Arayüzdeki
+"⧉ ilk satırı kopyala" düğmesiyle komutu alıp terminale yapıştırırsın; çalıştırmak
+istediğinde `ai -i` kullan.
 
 ```
 http://127.0.0.1:11435
