@@ -66,6 +66,30 @@ ve alttaki kaydırıcılardan model davranışını değiştirebilirsin.
 
 "temizle" düğmesi geçmişi siler. Sayfayı kapatınca sohbet kaybolur, ayarlar kalır.
 
+## GPU çalışıyor mu görmek
+
+`gpu-izle` komutu, model cevap verirken iGPU'nun uyanıp uyanmadığını gösterir:
+
+```
+$ gpu-izle
+      0 MHz   uyanık %0
+   1414 MHz   uyanık %100 ####################   <- cevap üretiliyor
+   1483 MHz   uyanık %100 ####################
+      0 MHz   uyanık %0
+```
+
+Gereken: `sudo apt install -y intel-gpu-tools` ve bir kez şu ayar —
+```
+echo kernel.perf_event_paranoid=0 | sudo tee /etc/sysctl.d/60-perf.conf
+sudo sysctl -p /etc/sysctl.d/60-perf.conf
+```
+(yoksa `sudo gpu-izle` diye çalıştır.)
+
+**gnome-system-monitor GPU/NPU göstermez** — o pencerede öyle bir sekme yok, eksik
+kurulum değil. `intel_gpu_top`'un motor sütunları (RCS/VCS) da bu çipte hep 0 kalır;
+Ubuntu 22.04'teki sürüm 2022 tarihli, Arrow Lake'in compute motorunu tanımıyor.
+İşi gösteren iki sütun saat hızı ve RC6 (uyku oranı) — `gpu-izle` tam olarak onları okur.
+
 ## Servis
 
 Model arka planda açık durur, ilk soruda beklemezsin.

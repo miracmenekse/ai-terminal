@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# GPU calisiyor mu? intel_gpu_top'un genis tablosundan iki ise yarar sutun:
+# act = gercek saat hizi, RC6 = uyku orani (100 = tamamen uykuda).
+# Motor sutunlari (RCS/VCS) bu cipte hep 0 kaliyor: intel-gpu-tools 1.26
+# Arrow Lake'in compute motorunu tanimiyor.
+command -v intel_gpu_top >/dev/null || {
+  echo "intel_gpu_top yok:  sudo apt install -y intel-gpu-tools"; exit 1; }
+[ "$(cat /proc/sys/kernel/perf_event_paranoid)" -le 0 ] || {
+  echo "Yetki yok. Ya 'sudo gpu-izle' calistir, ya da kalici olarak:"
+  echo "  echo kernel.perf_event_paranoid=0 | sudo tee /etc/sysctl.d/60-perf.conf"
+  echo "  sudo sysctl -p /etc/sysctl.d/60-perf.conf"; exit 1; }
+
+exec stdbuf -oL intel_gpu_top -l -s "${1:-500}" | awk '
+  $1 ~ /^[0-9]+$/ {
+    uyanik = 100 - $4
+    bar = ""
+    for (i = 0; i < int(uyanik/5); i++) bar = bar "#"
+    printf "  %5s MHz   uyanık %%%-3d %s\n", $2, uyanik, bar
+    fflush()
+  }'
