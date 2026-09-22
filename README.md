@@ -15,14 +15,49 @@ apt update 2>&1 | ai "bu hata neden oldu"  # çıktıyı modele ver
 
 ## Kurulum
 
+**0) Ön koşullar.** Temiz Ubuntu 22.04 masaüstü bunları getirmez:
+
 ```bash
-git clone https://github.com/miracmenekse/ai-terminal.git && cd ai-terminal
+sudo apt update
+sudo apt install -y git curl python3.10-venv
+sudo usermod -aG render $USER     # GPU erişimi için; sonra çıkış yapıp tekrar girin
+```
+
+Çekirdek 6.11+ olmalı — 22.04'ün kendi 5.15/6.8 çekirdeği Arrow Lake iGPU'yu
+sürmez, kurulum sessizce CPU'ya düşer. `install.sh` bunu başta kontrol eder.
+
+**1) Depoyu indirin.** Depo **private**, o yüzden düz `git clone` yeni bir
+makinede `could not read Username` verir. İki yol:
+
+```bash
+# a) SSH anahtarıyla (anahtarı GitHub > Settings > SSH keys'e ekledikten sonra)
+ssh-keygen -t ed25519 -C "$(hostname)" && cat ~/.ssh/id_ed25519.pub
+git clone git@github.com:miracmenekse/ai-terminal.git && cd ai-terminal
+
+# b) Anahtarsız: GitHub'da oturum açıp Code > Download ZIP
+unzip ~/İndirilenler/ai-terminal-master.zip && cd ai-terminal-master
+```
+
+**2) Kurun.**
+
+```bash
 ./install.sh GPU        # veya: ./install.sh CPU | NPU
 ```
 
-Yaptığı şey: `~/.local/share/ai-npu` altına bir venv kurar, modeli indirir (4,1 GB),
-`ai` komutunu `~/.local/bin`e koyar, `ai-npu` adlı systemd kullanıcı servisini açar.
-Tekrar çalıştırmak zararsız — var olanı yeniden indirmez.
+Yaptığı şey: `~/.local/share/ai-npu` altına bir venv kurar, **modeli indirir
+(~16 GB)**, `ai` komutunu `~/.local/bin`e koyar, `ai-npu` adlı systemd kullanıcı
+servisini açar. Tekrar çalıştırmak zararsız — var olanı yeniden indirmez.
+
+Az bellekli makine için küçük model: `./install.sh GPU llmware/qwen-2.5-coder-instruct-npu-ov`
+(4,1 GB). Varsayılan Qwen3-Coder-30B-A3B ~15 GB RAM ister.
+
+**3) İsteğe bağlı: `gpu-izle`.** Kurulur ama çalışması için iki şey gerekir:
+
+```bash
+sudo apt install -y intel-gpu-tools
+echo kernel.perf_event_paranoid=0 | sudo tee /etc/sysctl.d/60-perf.conf
+sudo sysctl -w kernel.perf_event_paranoid=0
+```
 
 ## Tarayıcı arayüzü
 

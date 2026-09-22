@@ -49,6 +49,10 @@ PROBE
 # GPU'yu sessizce kapatiyor: eski cekirdek (Arrow Lake iGPU'yu 22.04'un 5.15/6.8
 # cekirdegi surmuyor) ve kullanicinin render grubunda olmamasi. Onceden soyluyorum.
 onkosul() {
+    local eksik=""
+    for p in curl git; do command -v $p >/dev/null || eksik="$eksik $p"; done
+    python3 -c 'import venv, ensurepip' 2>/dev/null || eksik="$eksik python3-venv"
+    [ -n "$eksik" ] && { echo "!! Once bunlari kurun:  sudo apt install -y$eksik"; exit 1; }
     local k=$(uname -r | cut -d. -f1,2)
     if [ "$(printf '%s\n6.11\n' "$k" | sort -V | head -1)" != "6.11" ]; then
         echo "!! Cekirdek $k. Arrow Lake iGPU icin 6.11+ gerekiyor; GPU acilmazsa"
