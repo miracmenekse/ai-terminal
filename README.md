@@ -91,6 +91,23 @@ gpt-oss'ta `analysis...assistantfinal`). `clean()` bunu ayıklıyor, ama bütçe
 düşünürken biterse ortada cevap kalmıyor: o zaman ham metin gösteriliyor ki
 kullanıcı boş ekran görmesin.
 
+## Temiz kuruluma başlarken (aynı makine)
+
+`git clone` + `./install.sh GPU` yeterli, ama Ubuntu 22.04'ün kendi kurulumunda
+**iki şey betiğin dışında kalıyor ve ikisi de GPU'yu sessizce kapatır** — model
+yine çalışır, sadece CPU'da ve çok yavaş. `install.sh` artık ikisini de
+başlarken kontrol edip uyarıyor:
+
+- **Çekirdek 6.11+ olmalı.** 22.04'ün kendi 5.15/6.8 çekirdeği bu makinenin
+  Arrow Lake iGPU'sunu sürmez (ve BE200 wifi'ı da açmaz). Bu makinede
+  6.12.110 mainline kullanılıyor.
+- **Kullanıcı `render` grubunda olmalı:** `sudo usermod -aG render $USER`,
+  sonra çıkış-giriş. Yoksa `/dev/dri/renderD128` erişilemez.
+
+Model (~16 GB) HuggingFace'ten iniyor, depoda değil. Geri kalan her şey —
+prompt'lar, korumalar, `sik-kullanilanlar.md`, servis dosyası — depoda.
+
+
 ## Dayanıklılık turu (2026-09-22)
 
 Terminal ajanı literatüründe tekrarlanan kusurlar (Terminal-Bench, InterCode,

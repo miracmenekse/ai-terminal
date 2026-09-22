@@ -45,6 +45,24 @@ print("GPU" if "GPU" in ov.Core().available_devices else "CPU")
 PROBE
 }
 
+# Temiz Ubuntu 22.04 kurulumunda iki sey install.sh'in disinda kaliyor ve ikisi de
+# GPU'yu sessizce kapatiyor: eski cekirdek (Arrow Lake iGPU'yu 22.04'un 5.15/6.8
+# cekirdegi surmuyor) ve kullanicinin render grubunda olmamasi. Onceden soyluyorum.
+onkosul() {
+    local k=$(uname -r | cut -d. -f1,2)
+    if [ "$(printf '%s\n6.11\n' "$k" | sort -V | head -1)" != "6.11" ]; then
+        echo "!! Cekirdek $k. Arrow Lake iGPU icin 6.11+ gerekiyor; GPU acilmazsa"
+        echo "   mainline cekirdek kurun (bu makinede 6.12.110 kullaniliyor)."
+    fi
+    id -nG | grep -qw render || {
+        echo "!! render grubunda degilsiniz, GPU aygitina erisim engellenebilir:"
+        echo "     sudo usermod -aG render $USER   # sonra cikis yapip tekrar girin"
+    }
+    . /etc/os-release
+    [ "${VERSION_CODENAME:-}" = jammy ] || echo       "!! Bu betik Intel deposunu 'jammy' olarak ekliyor, sizde ${VERSION_CODENAME:-bilinmiyor}."
+}
+onkosul
+
 echo "==> $DEVICE icin kuruluyor"
 mkdir -p "$ROOT/models" "$HOME/.local/bin" "$HOME/.config/systemd/user"
 
