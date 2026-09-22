@@ -139,7 +139,27 @@ def yokbilgi(istek, ayrinti):
     return bool(YOK.search(cevap)), "komut onermedi + bilgi yok dedi"
 
 
+def bilgisorusu(istek, ayrinti):
+    """Bilgiyle cevaplanacak soru: klasor listesi verilse bile komut uretmemeli.
+    (Gercek kusur: 'usb icin kac GB lazim' -> '$ du -sh ubuntu-setup.log')"""
+    ctx = ("Bulunduğun klasör: /home/mirac\nBurada şunlar var:\nubuntu-setup.log\n"
+           "kurulum-notlari.txt\nvideo.mp4\nyedek.tar.gz\n\nİstek: " + istek)
+    cevap, _ = sor([{"role": "user", "content": ctx}])
+    cmd = komut(cevap)
+    print(f"  {cevap.splitlines()[0][:110]}")
+    if ayrinti:
+        print(f"    {cevap[:220]!r}")
+    if cmd:
+        return False, f"komut onerdi: {cmd[:50]}"
+    return True, "komut onermedi, bilgiyle cevapladi"
+
+
 S = [
+ ("Q", "usb'ye ubuntu kurulum dokümanını yüklemek istiyorum. kaç gb yer lazım", bilgisorusu, ()),
+ ("Q", "ubuntu'da swap alanı ne kadar olmalı", bilgisorusu, ()),
+ ("Q", "ext4 ile btrfs arasındaki fark ne", bilgisorusu, ()),
+ ("Q", "chmod 755 ne demek", bilgisorusu, ()),
+
  ("K", "vlc kur", kurulum, ()),
  ("K", "ekran görüntüsü almak için bir program kur", kurulum, ()),
  ("K", "video dönüştürmek için gereken programı kur", kurulum, ()),
@@ -173,7 +193,7 @@ S = [
 ]
 
 ayrinti = "-v" in sys.argv
-gruplar = [a for a in sys.argv[1:] if a in "KTSBY" and a != "-v"]
+gruplar = [a for a in sys.argv[1:] if a in "KTSBYQ" and a != "-v"]
 sec = [x for x in S if not gruplar or x[0] in gruplar]
 puan, toplam = {}, {}
 for grup, istek, fn, ek in sec:

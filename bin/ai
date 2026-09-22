@@ -158,6 +158,18 @@ def sutun_ipucu(cmd, cikti, oku):
     return ""
 
 
+# Klasor listesini isteğe eklemek modeli baska bir tuzaga soktu: soruyla alakasiz
+# olsa da listedeki bir dosyayi kapip komut uretiyor ("usb'ye ubuntu kurulumu kac GB
+# yer kaplar" -> "du -sh ubuntu-setup.log"). Kullanicinin hic anmadigi bir dosya adi
+# secmisse bir kez durduruyorum; prompt kurali bunu tutmadi.
+def kendi_secti(cmd, soru, liste):
+    for ad in AD.finditer(cmd):
+        t = ad.group(0)
+        if t in liste and t.lower() not in soru.lower():
+            return t
+    return None
+
+
 def anahtar(cmd):
     c = re.sub(r"^\s*cd\s+[^&|;]+&&\s*", "", cmd.strip())
     return re.sub(r"\s+", " ", c)
@@ -208,10 +220,11 @@ def etkilesimli():
             icerik = "\n".join(sorted(os.listdir("."))[:40])
         except OSError:
             icerik = ""
+        ham = istek          # kullanicinin kendi cumlesi: klasor listesi karismadan
         istek = (f"Bulunduğun klasör: {os.getcwd()}\nBurada şunlar var:\n{icerik}\n\n"
                  f"İstek: {istek}")
         kok, kosulan, duzeltildi, engel, eksikler = istek, [], False, 0, set()
-        bilinen, ad_uyarisi = istek, False
+        bilinen, ad_uyarisi, secim_uyarisi = istek, False, False
         for adim in range(ZINCIR):
             # Pencere son 10 mesaj. Zincirde her adim 2 mesaj ekledigi icin 5. adimda
             # asil istek disari tasiyor ve model gorevi unutup donguye giriyordu;
@@ -242,6 +255,13 @@ def etkilesimli():
                 break
             i, m = esler[0]
             cmd = m.group(1)
+            # Uyari verildikten sonra hala komut uretiyorsa: kullanici zaten bir dosya
+            # adi vermemisti, soru bilgiyle cevaplanir. Komutu atip duz cevabi gosteriyorum.
+            if secim_uyarisi and kendi_secti(cmd, ham, icerik) is None:
+                duz = "\n".join(satirlar[:i] + satirlar[i + 1:]).strip()
+                if duz:
+                    print(f"\n{duz}")
+                    break
             # Model bitisi fark etmeyip ayni komutu tekrarliyordu; talimat yetmedi.
             # Ikinci kez gelirse calistirmiyorum, zaten kostugunu soyleyip devam ediyorum.
             if kosulan.count(anahtar(cmd)) >= 2:      # bir yeniden kontrol mesru, ucuncusu dongu
@@ -255,6 +275,15 @@ def etkilesimli():
                     print("  \033[2m(aynı komutta takıldı, durdum)\033[0m")
                     break
                 engel += 1
+                continue
+            sad = None if secim_uyarisi else kendi_secti(cmd, ham, icerik)
+            if sad:
+                secim_uyarisi = True
+                print(f"  \033[33m(kullanıcının anmadığı dosyayı seçti: {sad})\033[0m")
+                istek = (f"Kullanıcı {sad} diye bir dosyadan söz etmedi; onu klasör "
+                         "listesinden kendin seçtin. O liste yalnızca bağlamdır. "
+                         "Soruyu kendi bilginle, komut vermeden yanıtla; gerçekten bir "
+                         "dosya gerekiyorsa hangisi olduğunu kullanıcıya sor.")
                 continue
             yad = None if ad_uyarisi else yabanci(cmd, bilinen)
             if yad:
@@ -339,6 +368,9 @@ if args[0] == "selftest":
     assert yabanci("basename x > bu.txt", "bulgu.txt dosyasına yaz") == "bu.txt"
     assert yabanci("grep -l HEDEF > bulgu.txt", "bulgu.txt dosyasına yaz") is None
     assert yabanci("basename x > gu.txt", "bulgu.txt dosyasına yaz") == "gu.txt"
+    liste = "ubuntu-setup.log\nnotlar"
+    assert kendi_secti("du -sh ubuntu-setup.log", "usb icin kac gb lazim", liste)
+    assert kendi_secti("du -sh ubuntu-setup.log", "ubuntu-setup.log kac MB", liste) is None
     assert "2 sütun" in sutun_ipucu("awk -F, '{s+=$4}' rapor.csv", "0",
                                     lambda f: "ad,tutar")
     assert sutun_ipucu("cat rapor.csv", "0", lambda f: "ad,tutar") == ""
